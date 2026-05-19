@@ -2,6 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
+function copiar(texto, label) {
+  navigator.clipboard.writeText(texto).then(() => {
+    alert(`${label} copiado!`);
+  });
+}
+
 export default function Clientes({ onLogout }) {
   const [clientes, setClientes] = useState([]);
   const [busca, setBusca] = useState('');
@@ -53,9 +59,12 @@ export default function Clientes({ onLogout }) {
         <div key={c.id} style={styles.card}>
           <div style={{ flex: 1 }}>
             <p style={styles.nome}>{c.nome}</p>
-            <p style={styles.info}>📞 {c.telefone}</p>
+            <p style={styles.info}>📞 <span style={styles.copiavel} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone}</span></p>
             <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-            <p style={styles.info}>🔑 Cód: {c.codigoEntrega} | 🛒 Pedidos: {c.qtdPedidos}</p>
+            <p style={styles.info}>
+              🔑 <span style={styles.copiavel} onClick={() => copiar(c.codigoEntrega, 'Código de entrega')}>{c.codigoEntrega}</span>
+              {' '}| 🛒 Pedidos: {c.qtdPedidos}
+            </p>
             {c.observacoes && <p style={styles.info}>📝 {c.observacoes}</p>}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -127,6 +136,7 @@ const styles = {
   card: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', border: '1px solid #2a2a4a' },
   nome: { color: '#e2b96f', fontWeight: 'bold', fontSize: 16, margin: '0 0 4px' },
   info: { color: '#ccc', fontSize: 13, margin: '0 0 2px' },
+  copiavel: { color: '#e2b96f', textDecoration: 'underline', cursor: 'pointer' },
   input: { width: '100%', backgroundColor: '#16213e', color: '#fff', border: '1px solid #2a2a4a', borderRadius: 10, padding: 12, fontSize: 15, boxSizing: 'border-box' },
   botaoAdd: { backgroundColor: '#e2b96f', color: '#1a1a2e', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
   botaoLogout: { backgroundColor: '#c0392b', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer' },
