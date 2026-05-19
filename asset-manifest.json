@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/NossoGranel/static/js/main.50223ccc.js",
-    "index.html": "/NossoGranel/index.html",
-    "main.50223ccc.js.map": "/NossoGranel/static/js/main.50223ccc.js.map"
+    "main.js": "./static/js/main.9340fb01.js",
+    "index.html": "./index.html",
+    "main.9340fb01.js.map": "./static/js/main.9340fb01.js.map"
   },
   "entrypoints": [
-    "static/js/main.50223ccc.js"
+    "static/js/main.9340fb01.js"
   ]
 }
