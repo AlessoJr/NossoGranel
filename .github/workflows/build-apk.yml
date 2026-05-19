@@ -26,6 +26,11 @@ jobs:
       - name: Build React
         run: npm run build
 
+      - name: Copy build to android assets
+        run: |
+          rm -rf android/app/src/main/assets/public
+          cp -r build android/app/src/main/assets/public
+
       - name: Sync Capacitor
         run: npx cap sync android
 
