@@ -19,7 +19,7 @@ export default function Login({ onLogin }) {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.titulo}>🌾 NossoGranel</h1>
+      <img src="/icon.png" alt="NossoGranel" style={styles.logo} />
       <p style={styles.sub}>Painel Administrativo</p>
       <form onSubmit={handleLogin} style={styles.form}>
         <input style={styles.input} type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
@@ -33,7 +33,7 @@ export default function Login({ onLogin }) {
 
 const styles = {
   container: { minHeight: '100vh', backgroundColor: '#1a1a2e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  titulo: { color: '#e2b96f', fontSize: 32, marginBottom: 8 },
+  logo: { width: 180, height: 180, borderRadius: '50%', marginBottom: 16, objectFit: 'cover' },
   sub: { color: '#aaa', fontSize: 14, marginBottom: 40 },
   form: { width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 16 },
   input: { backgroundColor: '#16213e', color: '#fff', border: '1px solid #333', borderRadius: 10, padding: 14, fontSize: 16 },
