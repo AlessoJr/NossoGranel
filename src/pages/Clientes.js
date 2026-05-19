@@ -1,0 +1,136 @@
+import React, { useEffect, useState } from 'react';
+import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
+export default function Clientes({ onLogout }) {
+  const [clientes, setClientes] = useState([]);
+  const [busca, setBusca] = useState('');
+  const [form, setForm] = useState(null);
+
+  async function carregar() {
+    const snap = await getDocs(collection(db, 'clientes'));
+    setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+
+  useEffect(() => { carregar(); }, []);
+
+  async function excluir(id) {
+    if (window.confirm('Excluir este cliente?')) {
+      await deleteDoc(doc(db, 'clientes', id));
+      carregar();
+    }
+  }
+
+  async function salvar(dados) {
+    if (dados.id) {
+      await updateDoc(doc(db, 'clientes', dados.id), dados);
+    } else {
+      await addDoc(collection(db, 'clientes'), dados);
+    }
+    setForm(null);
+    carregar();
+  }
+
+  const filtrados = clientes.filter(c =>
+    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+    c.telefone?.includes(busca) ||
+    c.codigoEntrega?.includes(busca)
+  );
+
+  if (form !== null) return <FormCliente cliente={form} onSalvar={salvar} onCancelar={() => setForm(null)} />;
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h1 style={styles.titulo}>🌾 Clientes</h1>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={styles.botaoAdd} onClick={() => setForm({})}>+ Novo</button>
+          <button style={styles.botaoLogout} onClick={onLogout}>Sair</button>
+        </div>
+      </div>
+      <input style={styles.busca} placeholder="Buscar por nome, telefone ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
+      {filtrados.map(c => (
+        <div key={c.id} style={styles.card}>
+          <div style={{ flex: 1 }}>
+            <p style={styles.nome}>{c.nome}</p>
+            <p style={styles.info}>📞 {c.telefone}</p>
+            <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+            <p style={styles.info}>🔑 Cód: {c.codigoEntrega} | 🛒 Pedidos: {c.qtdPedidos}</p>
+            {c.observacoes && <p style={styles.info}>📝 {c.observacoes}</p>}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button style={styles.botaoEditar} onClick={() => setForm(c)}>✏️</button>
+            <button style={styles.botaoDeletar} onClick={() => excluir(c.id)}>🗑️</button>
+          </div>
+        </div>
+      ))}
+      {filtrados.length === 0 && <p style={styles.vazio}>Nenhum cliente encontrado.</p>}
+    </div>
+  );
+}
+
+function FormCliente({ cliente, onSalvar, onCancelar }) {
+  const [dados, setDados] = useState({
+    nome: cliente.nome || '',
+    telefone: cliente.telefone || '',
+    endereco: cliente.endereco || '',
+    apt: cliente.apt || '',
+    codigoEntrega: cliente.codigoEntrega || '',
+    qtdPedidos: cliente.qtdPedidos || 0,
+    observacoes: cliente.observacoes || '',
+    id: cliente.id || null,
+  });
+
+  function handleChange(e) {
+    setDados({ ...dados, [e.target.name]: e.target.value });
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!dados.nome.trim()) { alert('Nome é obrigatório!'); return; }
+    onSalvar({ ...dados, qtdPedidos: parseInt(dados.qtdPedidos) || 0 });
+  }
+
+  return (
+    <div style={styles.container}>
+      <h2 style={styles.titulo}>{dados.id ? '✏️ Editar Cliente' : '➕ Novo Cliente'}</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 500 }}>
+        {[
+          { label: 'Nome *', name: 'nome', type: 'text' },
+          { label: 'Telefone', name: 'telefone', type: 'tel' },
+          { label: 'Endereço', name: 'endereco', type: 'text' },
+          { label: 'Apartamento', name: 'apt', type: 'text' },
+          { label: 'Código de Entrega', name: 'codigoEntrega', type: 'text' },
+          { label: 'Qtd. Pedidos', name: 'qtdPedidos', type: 'number' },
+        ].map(campo => (
+          <div key={campo.name}>
+            <label style={{ color: '#aaa', fontSize: 13 }}>{campo.label}</label>
+            <input style={styles.input} name={campo.name} type={campo.type} value={dados[campo.name]} onChange={handleChange} />
+          </div>
+        ))}
+        <div>
+          <label style={{ color: '#aaa', fontSize: 13 }}>Observações</label>
+          <textarea style={{ ...styles.input, height: 80 }} name="observacoes" value={dados.observacoes} onChange={handleChange} />
+        </div>
+        <button style={styles.botaoAdd} type="submit">💾 Salvar</button>
+        <button style={styles.botaoLogout} type="button" onClick={onCancelar}>Cancelar</button>
+      </form>
+    </div>
+  );
+}
+
+const styles = {
+  container: { minHeight: '100vh', backgroundColor: '#1a1a2e', padding: 16 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20 },
+  titulo: { color: '#e2b96f', fontSize: 24, margin: 0 },
+  busca: { width: '100%', backgroundColor: '#16213e', color: '#fff', border: '1px solid #333', borderRadius: 10, padding: 12, marginBottom: 12, boxSizing: 'border-box' },
+  card: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', border: '1px solid #2a2a4a' },
+  nome: { color: '#e2b96f', fontWeight: 'bold', fontSize: 16, margin: '0 0 4px' },
+  info: { color: '#ccc', fontSize: 13, margin: '0 0 2px' },
+  input: { width: '100%', backgroundColor: '#16213e', color: '#fff', border: '1px solid #2a2a4a', borderRadius: 10, padding: 12, fontSize: 15, boxSizing: 'border-box' },
+  botaoAdd: { backgroundColor: '#e2b96f', color: '#1a1a2e', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
+  botaoLogout: { backgroundColor: '#c0392b', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer' },
+  botaoEditar: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' },
+  botaoDeletar: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' },
+  vazio: { color: '#888', textAlign: 'center', marginTop: 40 },
+};
