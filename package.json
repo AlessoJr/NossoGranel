@@ -2,7 +2,7 @@
   "name": "nossogranel",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://alessojr.github.io/NossoGranel",
+  "homepage": "./",
   "dependencies": {
     "@capacitor/android": "^8.3.4",
     "@capacitor/cli": "^8.3.4",
