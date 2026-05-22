@@ -33,8 +33,33 @@ jobs:
     - name: Configurar Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: NÃO REMOVER A PASTA ANDROID - USAR A QUE JÁ ESTÁ NO REPO
-      run: echo "Usando pasta android existente"
+    - name: Instalar Capacitor Android
+      run: npm install @capacitor/android
+
+    - name: Criar projeto Android do zero
+      run: npx cap add android
+
+    - name: Substituir ícones padrão pelo granel.png
+      run: |
+        # Criar pastas
+        mkdir -p android/app/src/main/res/mipmap-hdpi
+        mkdir -p android/app/src/main/res/mipmap-mdpi
+        mkdir -p android/app/src/main/res/mipmap-xhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+        
+        # Copiar ícone da pasta app_icons (que está no repositório)
+        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+        
+        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
 
     - name: Copiar build para Android
       run: npx cap copy android
