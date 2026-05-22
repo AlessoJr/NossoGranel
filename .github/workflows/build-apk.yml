@@ -33,6 +33,9 @@ jobs:
     - name: Configurar Android SDK
       uses: android-actions/setup-android@v3
 
+    - name: Remover pasta android existente
+      run: rm -rf android
+
     - name: Instalar Capacitor Android
       run: npm install @capacitor/android
 
