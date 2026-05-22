@@ -33,14 +33,39 @@ jobs:
     - name: Configurar Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Remover pasta android existente
-      run: rm -rf android
-
     - name: Instalar Capacitor Android
       run: npm install @capacitor/android
 
     - name: Adicionar plataforma Android
       run: npx cap add android
+
+    - name: SUBSTITUIR ÍCONE PADRÃO PELO GRANEL.PNG
+      run: |
+        # Criar as pastas de ícones
+        mkdir -p android/app/src/main/res/mipmap-hdpi
+        mkdir -p android/app/src/main/res/mipmap-mdpi
+        mkdir -p android/app/src/main/res/mipmap-xhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+        
+        # Copiar o ícone granel.png para TODOS os lugares que o Android usa
+        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+        
+        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+        
+        # Também copiar para drawable (fallback)
+        mkdir -p android/app/src/main/res/drawable
+        cp app_icons/granel.png android/app/src/main/res/drawable/ic_launcher.png
+        
+        echo "✅ Ícone granel.png instalado no APK"
 
     - name: Copiar build para Android
       run: npx cap copy android
