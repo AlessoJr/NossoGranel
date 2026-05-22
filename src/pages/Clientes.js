@@ -19,7 +19,7 @@ function tratarCampo(valor) {
   return String(valor);
 }
 
-export default function Clientes({ onLogout, onStats, onRota }) {
+export default function Clientes({ onLogout, onStats, onRota, onImportarIfood }) {
   const [clientes, setClientes] = useState([]);
   const [busca, setBusca] = useState('');
   const [form, setForm] = useState(null);
@@ -126,7 +126,7 @@ export default function Clientes({ onLogout, onStats, onRota }) {
           >
             ⏳ Lista de Espera
           </button>
-          <MenuADM onLogout={onLogout} temaEscuro={temaEscuro} alternarTema={alternarTema} onRota={onRota} />
+          <MenuADM onLogout={onLogout} temaEscuro={temaEscuro} alternarTema={alternarTema} onRota={onRota} onImportarIfood={onImportarIfood} />
         </div>
       </div>
       <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} placeholder="Buscar por nome, telefone ou código..." value={busca} onChange={e => setBusca(e.target.value)} />

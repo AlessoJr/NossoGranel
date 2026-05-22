@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTema } from '../ThemeContext';
 
-export default function MenuADM({ onLogout, temaEscuro, alternarTema, onRota }) {
+export default function MenuADM({ onLogout, temaEscuro, alternarTema, onRota, onImportarIfood }) {
   const [menuAberto, setMenuAberto] = useState(false);
 
   const cores = temaEscuro ? coresEscuro : coresClaro;
@@ -35,6 +35,11 @@ export default function MenuADM({ onLogout, temaEscuro, alternarTema, onRota }) 
             <div style={{ ...styles.item, borderBottomColor: cores.borda }} onClick={onRota}>
               <span style={styles.icone}>🗺️</span>
               <span style={{ ...styles.itemTexto, color: cores.texto }}>Rota de Entrega</span>
+            </div>
+
+            <div style={{ ...styles.item, borderBottomColor: cores.borda }} onClick={onImportarIfood}>
+              <span style={styles.icone}>🍔</span>
+              <span style={{ ...styles.itemTexto, color: cores.texto }}>Importar do iFood</span>
             </div>
 
             <div style={{ ...styles.item, borderBottomColor: cores.borda }} onClick={alternarTema}>
