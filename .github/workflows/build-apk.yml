@@ -33,6 +33,9 @@ jobs:
     - name: Configurar Android SDK
       uses: android-actions/setup-android@v3
 
+    - name: REMOVER PASTA ANDROID EXISTENTE
+      run: rm -rf android
+
     - name: Instalar Capacitor Android
       run: npm install @capacitor/android
 
@@ -41,14 +44,12 @@ jobs:
 
     - name: Substituir ícones padrão pelo granel.png
       run: |
-        # Criar pastas
         mkdir -p android/app/src/main/res/mipmap-hdpi
         mkdir -p android/app/src/main/res/mipmap-mdpi
         mkdir -p android/app/src/main/res/mipmap-xhdpi
         mkdir -p android/app/src/main/res/mipmap-xxhdpi
         mkdir -p android/app/src/main/res/mipmap-xxxhdpi
         
-        # Copiar ícone da pasta app_icons (que está no repositório)
         cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
         cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
         cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
