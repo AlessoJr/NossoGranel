@@ -3,7 +3,18 @@ import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc } from 'firebase
 import { db } from '../firebase';
 
 function copiar(texto, label) {
+  if (!texto || texto === 'null' || texto === 'undefined') {
+    alert('Nada para copiar');
+    return;
+  }
   navigator.clipboard.writeText(texto).then(() => alert(`${label} copiado!`));
+}
+
+function tratarCampo(valor) {
+  if (valor === null || valor === undefined || valor === 'null' || valor === 'undefined') {
+    return '';
+  }
+  return String(valor);
 }
 
 export default function Clientes({ onLogout }) {
@@ -13,11 +24,20 @@ export default function Clientes({ onLogout }) {
 
   async function carregar() {
     const snap = await getDocs(collection(db, 'clientes'));
-    const lista = snap.docs.map(d => ({ 
-      id: d.id, 
-      ...d.data(),
-      fixado: d.data().fixado === true ? true : false
-    }));
+    const lista = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        nome: tratarCampo(data.nome),
+        telefone: tratarCampo(data.telefone),
+        endereco: tratarCampo(data.endereco),
+        apt: tratarCampo(data.apt),
+        codigoEntrega: tratarCampo(data.codigoEntrega),
+        qtdPedidos: data.qtdPedidos || 0,
+        observacoes: tratarCampo(data.observacoes),
+        fixado: data.fixado === true ? true : false
+      };
+    });
     const ordenados = [...lista].sort((a, b) => {
       if (a.fixado && !b.fixado) return -1;
       if (!a.fixado && b.fixado) return 1;
@@ -31,45 +51,35 @@ export default function Clientes({ onLogout }) {
   async function excluir(id) {
     if (window.confirm('Excluir este cliente?')) {
       await deleteDoc(doc(db, 'clientes', id));
-      carregar();
+      await carregar();
     }
   }
 
   async function salvar(dados) {
-    try {
-      const dadosParaSalvar = {
-        nome: dados.nome || '',
-        telefone: dados.telefone || '',
-        endereco: dados.endereco || '',
-        apt: dados.apt || '',
-        codigoEntrega: dados.codigoEntrega || '',
-        qtdPedidos: Number(dados.qtdPedidos) || 0,
-        observacoes: dados.observacoes || '',
-        fixado: dados.fixado === true ? true : false
-      };
+    const dadosParaSalvar = {
+      nome: tratarCampo(dados.nome),
+      telefone: tratarCampo(dados.telefone),
+      endereco: tratarCampo(dados.endereco),
+      apt: tratarCampo(dados.apt),
+      codigoEntrega: tratarCampo(dados.codigoEntrega),
+      qtdPedidos: Number(dados.qtdPedidos) || 0,
+      observacoes: tratarCampo(dados.observacoes),
+      fixado: dados.fixado === true ? true : false
+    };
 
-      if (dados.id) {
-        await updateDoc(doc(db, 'clientes', dados.id), dadosParaSalvar);
-      } else {
-        await addDoc(collection(db, 'clientes'), dadosParaSalvar);
-      }
-      setForm(null);
-      await carregar();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar cliente');
+    if (dados.id) {
+      await updateDoc(doc(db, 'clientes', dados.id), dadosParaSalvar);
+    } else {
+      await addDoc(collection(db, 'clientes'), dadosParaSalvar);
     }
+    setForm(null);
+    await carregar();
   }
 
   async function toggleFixado(id, fixadoAtual) {
-    try {
-      const novoFixado = !fixadoAtual;
-      await updateDoc(doc(db, 'clientes', id), { fixado: novoFixado });
-      await carregar();
-    } catch (error) {
-      console.error('Erro ao fixar:', error);
-      alert('Erro ao fixar cliente');
-    }
+    const novoFixado = !fixadoAtual;
+    await updateDoc(doc(db, 'clientes', id), { fixado: novoFixado });
+    await carregar();
   }
 
   const filtrados = busca.trim() === '' 
