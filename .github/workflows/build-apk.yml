@@ -36,8 +36,29 @@ jobs:
     - name: Instalar Capacitor
       run: npm install @capacitor/android
 
+    - name: REMOVER PASTA ANDROID EXISTENTE
+      run: rm -rf android
+
     - name: Adicionar Android
       run: npx cap add android
+
+    - name: SUBSTITUIR ÍCONE PELO GRANEL.PNG
+      run: |
+        mkdir -p android/app/src/main/res/mipmap-hdpi
+        mkdir -p android/app/src/main/res/mipmap-mdpi
+        mkdir -p android/app/src/main/res/mipmap-xhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxhdpi
+        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
 
     - name: Copiar build
       run: npx cap copy android
