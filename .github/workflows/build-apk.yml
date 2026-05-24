@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Pegar código do repositório
+    - name: Pegar código
       uses: actions/checkout@v4
 
     - name: Instalar Node.js
@@ -21,10 +21,10 @@ jobs:
     - name: Instalar dependências
       run: npm install
 
-    - name: Build do React
+    - name: Build React
       run: npm run build
 
-    - name: Instalar Java 21
+    - name: Instalar Java
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -33,36 +33,13 @@ jobs:
     - name: Configurar Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: REMOVER PASTA ANDROID EXISTENTE
-      run: rm -rf android
-
-    - name: Instalar Capacitor Android
+    - name: Instalar Capacitor
       run: npm install @capacitor/android
 
-    - name: Criar projeto Android do zero
+    - name: Adicionar Android
       run: npx cap add android
 
-    - name: Substituir ícones padrão pelo granel.png
-      run: |
-        mkdir -p android/app/src/main/res/mipmap-hdpi
-        mkdir -p android/app/src/main/res/mipmap-mdpi
-        mkdir -p android/app/src/main/res/mipmap-xhdpi
-        mkdir -p android/app/src/main/res/mipmap-xxhdpi
-        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-        
-        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-        
-        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
-
-    - name: Copiar build para Android
+    - name: Copiar build
       run: npx cap copy android
 
     - name: Gerar APK
@@ -71,7 +48,7 @@ jobs:
         chmod +x gradlew
         ./gradlew assembleDebug
 
-    - name: Fazer upload do APK
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: NossoGranel-APK
