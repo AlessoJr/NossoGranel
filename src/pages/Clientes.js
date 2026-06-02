@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, deleteDoc, doc, addDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 function copiar(texto, label) {
@@ -23,9 +23,15 @@ export default function Clientes({ onLogout }) {
     return () => { unsub1(); unsub2(); };
   }, []);
 
-  async function excluir(id) {
+  async function excluirCliente(id) {
     if (window.confirm('Excluir este cliente?')) {
       await deleteDoc(doc(db, 'clientes', id));
+    }
+  }
+
+  async function excluirRota(id) {
+    if (window.confirm('Excluir esta rota?')) {
+      await deleteDoc(doc(db, 'rotas', id));
     }
   }
 
@@ -46,7 +52,7 @@ export default function Clientes({ onLogout }) {
   );
 
   const rotasEmAndamento = rotas.filter(r => r.status === 'em_rota');
-  const rotasConcluidas = rotas.filter(r => r.status === 'concluida');
+  const rotasConcluidas = rotas.filter(r => r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
 
   if (form !== null) return <FormCliente cliente={form} onSalvar={salvar} onCancelar={() => setForm(null)} />;
 
@@ -59,7 +65,9 @@ export default function Clientes({ onLogout }) {
 
       <div style={styles.abas}>
         <button style={aba === 'clientes' ? styles.abaAtiva : styles.aba} onClick={() => setAba('clientes')}>👥 Clientes</button>
-        <button style={aba === 'rotas' ? styles.abaAtiva : styles.aba} onClick={() => setAba('rotas')}>🚚 Rotas {rotasEmAndamento.length > 0 && `(${rotasEmAndamento.length})`}</button>
+        <button style={aba === 'rotas' ? styles.abaAtiva : styles.aba} onClick={() => setAba('rotas')}>
+          🚚 Rotas {rotasEmAndamento.length > 0 && <span style={styles.badge}>{rotasEmAndamento.length}</span>}
+        </button>
         <button style={aba === 'historico' ? styles.abaAtiva : styles.aba} onClick={() => setAba('historico')}>📋 Histórico</button>
       </div>
 
@@ -78,7 +86,7 @@ export default function Clientes({ onLogout }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button style={styles.botaoEditar} onClick={() => setForm(c)}>✏️</button>
-                <button style={styles.botaoDeletar} onClick={() => excluir(c.id)}>🗑️</button>
+                <button style={styles.botaoDeletar} onClick={() => excluirCliente(c.id)}>🗑️</button>
               </div>
             </div>
           ))}
@@ -92,10 +100,15 @@ export default function Clientes({ onLogout }) {
           {rotasEmAndamento.length === 0 && <p style={styles.vazio}>Nenhuma rota em andamento.</p>}
           {rotasEmAndamento.map(r => (
             <div key={r.id} style={styles.cardRota}>
-              <p style={styles.nome}>{r.clienteNome}</p>
-              <p style={styles.info}>👤 Entregador: {r.entregador}</p>
-              <p style={styles.info}>🔑 Código: <span style={styles.copiavel} onClick={() => copiar(r.codigoEntrega, 'Código')}>{r.codigoEntrega}</span></p>
-              <p style={styles.info}>🕐 Iniciado: {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={styles.nome}>{r.clienteNome}</p>
+                  <p style={styles.info}>👤 Entregador: <strong style={{ color: '#e2b96f' }}>{r.entregador}</strong></p>
+                  <p style={styles.info}>🔑 Código: <span style={styles.copiavel} onClick={() => copiar(r.codigoEntrega, 'Código')}>{r.codigoEntrega}</span></p>
+                  <p style={styles.info}>🕐 Iniciado: {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+                </div>
+                <button style={styles.botaoDeletar} onClick={() => excluirRota(r.id)}>🗑️</button>
+              </div>
             </div>
           ))}
         </>
@@ -105,12 +118,18 @@ export default function Clientes({ onLogout }) {
         <>
           <h3 style={{ color: '#e2b96f', marginBottom: 12 }}>📋 Entregas Concluídas</h3>
           {rotasConcluidas.length === 0 && <p style={styles.vazio}>Nenhuma entrega concluída.</p>}
-          {rotasConcluidas.sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm)).map(r => (
+          {rotasConcluidas.map(r => (
             <div key={r.id} style={styles.cardConcluido}>
-              <p style={styles.nome}>{r.clienteNome}</p>
-              <p style={styles.info}>👤 Entregador: {r.entregador}</p>
-              <p style={styles.info}>🔑 Código: {r.codigoEntrega}</p>
-              <p style={styles.info}>✅ Concluído: {new Date(r.concluidoEm).toLocaleString('pt-BR')}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={styles.nome}>{r.clienteNome}</p>
+                  <p style={styles.info}>👤 Entregador: {r.entregador}</p>
+                  <p style={styles.info}>🔑 Código: <span style={styles.copiavel} onClick={() => copiar(r.codigoEntrega, 'Código')}>{r.codigoEntrega}</span></p>
+                  <p style={styles.info}>🕐 Iniciado: {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+                  <p style={styles.info}>✅ Concluído: {new Date(r.concluidoEm).toLocaleString('pt-BR')}</p>
+                </div>
+                <button style={styles.botaoDeletar} onClick={() => excluirRota(r.id)}>🗑️</button>
+              </div>
             </div>
           ))}
         </>
@@ -176,6 +195,7 @@ const styles = {
   abas: { display: 'flex', gap: 8, marginBottom: 16 },
   aba: { flex: 1, backgroundColor: '#16213e', color: '#aaa', border: '1px solid #2a2a4a', borderRadius: 8, padding: '8px 4px', fontSize: 13, cursor: 'pointer' },
   abaAtiva: { flex: 1, backgroundColor: '#e2b96f', color: '#1a1a2e', border: 'none', borderRadius: 8, padding: '8px 4px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer' },
+  badge: { backgroundColor: '#c0392b', color: '#fff', borderRadius: '50%', padding: '2px 6px', fontSize: 11, marginLeft: 4 },
   busca: { width: '100%', backgroundColor: '#16213e', color: '#fff', border: '1px solid #333', borderRadius: 10, padding: 12, marginBottom: 12, boxSizing: 'border-box' },
   card: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', border: '1px solid #2a2a4a' },
   cardRota: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #e2b96f' },
