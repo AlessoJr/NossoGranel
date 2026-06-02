@@ -1,7 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { getClientesRealtime, iniciarRota, concluirRota, getRotasRealtime, getConfiguracoes } from '../services/firebaseService';
+import React, { useEffect, useState, useRef } from 'react';
+import { getClientesRealtime, iniciarRota, concluirRota, getRotasRealtime, atualizarLocalizacao } from '../services/firebaseService';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
+
+function abrirGPS(endereco, apt) {
+  const end = `${endereco}${apt ? ` ${apt}` : ''}`;
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(end)}`, '_blank');
+}
 
 export default function EntregadorHome({ usuario, onLogout }) {
   const { darkMode, toggleTheme } = useTheme();
@@ -9,136 +14,66 @@ export default function EntregadorHome({ usuario, onLogout }) {
   const [clientes, setClientes] = useState([]);
   const [rotas, setRotas] = useState([]);
   const [busca, setBusca] = useState('');
-  const [rotaAtiva, setRotaAtiva] = useState(null);
-  const [ordemRota, setOrdemRota] = useState([]);
-  const [assinaturaOpcional, setAssinaturaOpcional] = useState(false);
-  const [showAssinatura, setShowAssinatura] = useState(false);
-  const [assinatura, setAssinatura] = useState('');
+  const [aba, setAba] = useState('clientes');
+  const [selecionados, setSelecionados] = useState([]);
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const watchIdRef = useRef(null);
 
   useEffect(() => {
-    const unsubscribeClientes = getClientesRealtime(setClientes);
-    const unsubscribeRotas = getRotasRealtime((todasRotas) => {
-      const minhaRotaAtiva = todasRotas.find(r => r.entregador === usuario.nome && r.status === 'em_andamento');
-      setRotaAtiva(minhaRotaAtiva || null);
-      if (minhaRotaAtiva && minhaRotaAtiva.ordem) {
-        setOrdemRota(minhaRotaAtiva.ordem);
-      }
-      setRotas(todasRotas);
-    });
-    carregarConfig();
+    const unsub1 = getClientesRealtime(setClientes);
+    const unsub2 = getRotasRealtime(setRotas);
+
+    // Rastreamento GPS contínuo
+    if (navigator.geolocation) {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          atualizarLocalizacao(usuario.nome, pos.coords.latitude, pos.coords.longitude);
+        },
+        (err) => console.log('GPS erro:', err),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      );
+    }
+
     return () => {
-      unsubscribeClientes();
-      unsubscribeRotas();
+      unsub1();
+      unsub2();
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
   }, [usuario.nome]);
 
-  const carregarConfig = async () => {
-    const config = await getConfiguracoes();
-    setAssinaturaOpcional(config.assinaturaOpcional || false);
-  };
+  const minhasRotas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'em_andamento');
+  const minhasConcluidas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
 
-  const handleIniciarRota = async (cliente) => {
-    const novaOrdem = [cliente.id];
-    await iniciarRota(cliente, usuario.nome);
-    setOrdemRota(novaOrdem);
-    toast.success(`Rota iniciada para ${cliente.nome}`);
-  };
-
-  const handleReordenar = (clienteId, direcao) => {
-    const index = ordemRota.indexOf(clienteId);
-    if (direcao === 'cima' && index > 0) {
-      const novaOrdem = [...ordemRota];
-      [novaOrdem[index], novaOrdem[index - 1]] = [novaOrdem[index - 1], novaOrdem[index]];
-      setOrdemRota(novaOrdem);
-      toast.info('Ordem da rota atualizada');
-    } else if (direcao === 'baixo' && index < ordemRota.length - 1) {
-      const novaOrdem = [...ordemRota];
-      [novaOrdem[index], novaOrdem[index + 1]] = [novaOrdem[index + 1], novaOrdem[index]];
-      setOrdemRota(novaOrdem);
-      toast.info('Ordem da rota atualizada');
-    }
-  };
-
-  const handleConcluirRota = async () => {
-    if (assinaturaOpcional && !showAssinatura) {
-      setShowAssinatura(true);
-      return;
-    }
-    if (rotaAtiva) {
-      await concluirRota(rotaAtiva.id);
-      setRotaAtiva(null);
-      setOrdemRota([]);
-      setShowAssinatura(false);
-      setAssinatura('');
-      toast.success('✅ Entrega concluída com sucesso!');
-    }
-  };
-
-  const clientesOrdenados = ordemRota.length > 0
-    ? ordemRota.map(id => clientes.find(c => c.id === id)).filter(c => c)
-    : clientes;
-
-  const clientesFiltrados = clientesOrdenados.filter(c =>
+  const clientesFiltrados = clientes.filter(c =>
     c?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
     c?.codigoEntrega?.includes(busca)
   );
 
-  // Tela de assinatura
-  if (showAssinatura) {
-    return (
-      <div style={{ ...styles.container, backgroundColor: cores.background }}>
-        <h2 style={{ ...styles.titulo, color: cores.primary }}>✍️ Assinatura do Cliente</h2>
-        <div style={{ ...styles.cardAssinatura, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
-          <p style={{ color: cores.text }}>Cliente: <strong>{rotaAtiva?.clienteNome}</strong></p>
-          <textarea
-            style={{ ...styles.assinaturaInput, backgroundColor: cores.background, color: cores.text, borderColor: cores.cardBorder }}
-            rows={3}
-            placeholder="Nome do cliente ou 'Cliente não disponível para assinar'"
-            value={assinatura}
-            onChange={e => setAssinatura(e.target.value)}
-          />
-          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-            <button style={{ ...styles.botaoConcluir, backgroundColor: cores.success, color: '#fff' }} onClick={handleConcluirRota}>
-              ✅ Confirmar Entrega
-            </button>
-            <button style={{ ...styles.botaoVoltar, backgroundColor: cores.danger, color: '#fff' }} onClick={() => setShowAssinatura(false)}>
-              ← Voltar
-            </button>
-          </div>
-        </div>
-      </div>
+  function toggleSelecionar(clienteId) {
+    setSelecionados(prev =>
+      prev.includes(clienteId) ? prev.filter(id => id !== clienteId) : [...prev, clienteId]
     );
   }
 
-  // Tela de rota ativa
-  if (rotaAtiva) {
-    const clienteAtual = clientes.find(c => c.id === rotaAtiva.clienteId);
-    return (
-      <div style={{ ...styles.container, backgroundColor: cores.background }}>
-        <h2 style={{ ...styles.titulo, color: cores.primary }}>🚚 Em Rota</h2>
-        <div style={{ ...styles.cardRota, backgroundColor: cores.card, borderColor: cores.primary }}>
-          <p style={{ ...styles.nome, color: cores.primary }}>{rotaAtiva.clienteNome}</p>
-          <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {rotaAtiva.clienteEndereco}{rotaAtiva.clienteApt ? `, Apt ${rotaAtiva.clienteApt}` : ''}</p>
-          <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {rotaAtiva.clienteTelefone}</p>
-          <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: <strong style={{ color: cores.primary, fontSize: 20 }}>{rotaAtiva.codigoEntrega}</strong></p>
-          <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Iniciado: {new Date(rotaAtiva.iniciadoEm).toLocaleString('pt-BR')}</p>
-        </div>
+  async function iniciarRotasSelecionadas() {
+    if (selecionados.length === 0) { toast.warning('Selecione ao menos um cliente!'); return; }
+    for (const id of selecionados) {
+      const cliente = clientes.find(c => c.id === id);
+      if (cliente) {
+        const jaEmRota = rotas.find(r => r.clienteId === id && r.status === 'em_andamento');
+        if (!jaEmRota) await iniciarRota(cliente, usuario.nome);
+      }
+    }
+    setSelecionados([]);
+    setModoSelecao(false);
+    setAba('rotas');
+    toast.success(`${selecionados.length} rota(s) iniciada(s)!`);
+  }
 
-        {/* Próximos clientes na rota */}
-        {ordemRota.length > 1 && (
-          <div style={{ ...styles.proximos, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
-            <h4 style={{ color: cores.text }}>📋 Próximos na rota:</h4>
-            {ordemRota.slice(1).map(id => {
-              const c = clientes.find(c => c.id === id);
-              return c ? <p key={id} style={{ color: cores.textSecondary }}>• {c.nome}</p> : null;
-            })}
-          </div>
-        )}
-
-        <button style={{ ...styles.botaoConcluir, backgroundColor: cores.success, color: '#fff' }} onClick={handleConcluirRota}>✅ Concluir Entrega</button>
-        <button style={{ ...styles.botaoVoltar, backgroundColor: cores.danger, color: '#fff' }} onClick={() => setRotaAtiva(null)}>← Cancelar Rota</button>
-      </div>
-    );
+  async function handleConcluirRota(rota) {
+    if (!window.confirm(`Concluir entrega de ${rota.clienteNome}?`)) return;
+    await concluirRota(rota.id, rota.codigoEntrega);
+    toast.success(`✅ Entrega de ${rota.clienteNome} concluída!`);
   }
 
   return (
@@ -147,72 +82,128 @@ export default function EntregadorHome({ usuario, onLogout }) {
         <h1 style={{ ...styles.titulo, color: cores.primary }}>🚚 {usuario.nome}</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={{ ...styles.botaoTema, backgroundColor: cores.card, color: cores.text }} onClick={toggleTheme}>🌓</button>
-          <button style={{ ...styles.botaoSair, backgroundColor: cores.danger, color: '#fff' }} onClick={onLogout}>Sair</button>
+          <button style={{ ...styles.botaoSair, backgroundColor: '#c0392b', color: '#fff' }} onClick={onLogout}>Sair</button>
         </div>
       </div>
 
-      {/* ATALHOS */}
-      <div style={{ ...styles.atalhos, backgroundColor: cores.card }}>
-        <span style={{ color: cores.text }}>📅 {new Date().toLocaleDateString('pt-BR')}</span>
-        <span style={{ color: cores.text }}>🎯 Meta: 15 entregas/dia</span>
+      <div style={styles.abas}>
+        <button style={aba === 'clientes' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('clientes')}>👥 Clientes</button>
+        <button style={aba === 'rotas' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('rotas')}>🚚 Em Rota ({minhasRotas.length})</button>
+        <button style={aba === 'concluidas' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('concluidas')}>✅ Concluídas ({minhasConcluidas.length})</button>
       </div>
 
-      <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar cliente ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
+      {aba === 'clientes' && (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button
+              style={{ ...styles.botaoSelecao, backgroundColor: modoSelecao ? '#c0392b' : cores.primary, color: modoSelecao ? '#fff' : cores.background }}
+              onClick={() => { setModoSelecao(!modoSelecao); setSelecionados([]); }}>
+              {modoSelecao ? '✖ Cancelar' : '☑️ Selecionar'}
+            </button>
+            {modoSelecao && selecionados.length > 0 && (
+              <button style={{ ...styles.botaoSelecao, backgroundColor: '#27ae60', color: '#fff' }} onClick={iniciarRotasSelecionadas}>
+                🚚 Iniciar {selecionados.length} rota(s)
+              </button>
+            )}
+          </div>
 
-      {/* Ordem da rota (se tiver) */}
-      {ordemRota.length > 0 && (
-        <div style={{ ...styles.ordemInfo, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
-          <p style={{ color: cores.text }}>📋 Ordem da rota definida: {ordemRota.length} cliente(s)</p>
-          <button style={{ ...styles.botaoLimparOrdem, backgroundColor: cores.danger, color: '#fff' }} onClick={() => setOrdemRota([])}>Limpar ordem</button>
-        </div>
+          <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar cliente ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
+
+          {clientesFiltrados.map(c => {
+            const emRota = rotas.find(r => r.clienteId === c.id && r.status === 'em_andamento');
+            const selecionado = selecionados.includes(c.id);
+            return (
+              <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: selecionado ? '#27ae60' : emRota ? cores.primary : cores.cardBorder, borderWidth: selecionado || emRota ? 2 : 1 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ ...styles.nome, color: cores.primary }}>
+                    {c.nome}
+                    {emRota && <span style={{ fontSize: 12, color: '#27ae60', marginLeft: 8 }}>🚚 Em rota</span>}
+                  </p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {c.telefone}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 {c.codigoEntrega}</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {modoSelecao ? (
+                    <button
+                      style={{ ...styles.botaoCheck, backgroundColor: selecionado ? '#27ae60' : cores.cardBorder, color: '#fff' }}
+                      onClick={() => toggleSelecionar(c.id)}>
+                      {selecionado ? '✓' : '○'}
+                    </button>
+                  ) : (
+                    !emRota && (
+                      <button style={{ ...styles.botaoIniciar, backgroundColor: cores.primary, color: cores.background }} onClick={async () => {
+                        await iniciarRota(c, usuario.nome);
+                        setAba('rotas');
+                        toast.success(`Rota iniciada para ${c.nome}!`);
+                      }}>🚚</button>
+                    )
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {clientesFiltrados.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhum cliente encontrado.</p>}
+        </>
       )}
 
-      {clientesFiltrados.map((c, idx) => (
-        <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
-          <div style={{ flex: 1 }}>
-            <p style={{ ...styles.nome, color: cores.primary }}>{c.nome}</p>
-            <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-            <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {c.telefone}</p>
-            <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: {c.codigoEntrega}</p>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {ordemRota.length > 0 && ordemRota.includes(c.id) && (
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button style={styles.botaoReordenar} onClick={() => handleReordenar(c.id, 'cima')}>▲</button>
-                <button style={styles.botaoReordenar} onClick={() => handleReordenar(c.id, 'baixo')}>▼</button>
+      {aba === 'rotas' && (
+        <>
+          <h3 style={{ color: cores.primary, marginBottom: 12 }}>🚚 Minhas Entregas em Andamento</h3>
+          {minhasRotas.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhuma rota em andamento.</p>}
+          {minhasRotas.map(r => (
+            <div key={r.id} style={{ ...styles.cardRota, backgroundColor: cores.card }}>
+              <p style={{ ...styles.nome, color: cores.primary }}>{r.clienteNome}</p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {r.clienteTelefone}</p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: <strong style={{ color: cores.primary, fontSize: 20 }}>{r.codigoEntrega}</strong></p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button style={styles.botaoGPS} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 GPS</button>
+                <button style={styles.botaoConcluir} onClick={() => handleConcluirRota(r)}>✅ Concluir</button>
               </div>
-            )}
-            <button style={{ ...styles.botaoIniciar, backgroundColor: cores.primary, color: cores.background }} onClick={() => handleIniciarRota(c)}>
-              🚚 Iniciar
-            </button>
-          </div>
-        </div>
-      ))}
-      {clientesFiltrados.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhum cliente encontrado.</p>}
+            </div>
+          ))}
+        </>
+      )}
+
+      {aba === 'concluidas' && (
+        <>
+          <h3 style={{ color: cores.primary, marginBottom: 12 }}>✅ Minhas Entregas Concluídas</h3>
+          {minhasConcluidas.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhuma entrega concluída.</p>}
+          {minhasConcluidas.map(r => (
+            <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card }}>
+              <p style={{ ...styles.nome, color: cores.primary }}>{r.clienteNome}</p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: <strong style={{ color: '#27ae60' }}>{r.codigoEntrega}</strong></p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Iniciado: {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+              <p style={{ ...styles.info, color: '#27ae60' }}>✅ Concluído: {new Date(r.concluidoEm).toLocaleString('pt-BR')}</p>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
 
 const styles = {
   container: { minHeight: '100vh', padding: 16 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20, flexWrap: 'wrap', gap: 10 },
-  titulo: { fontSize: 24, margin: 0 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20 },
+  titulo: { fontSize: 22, margin: 0 },
   botaoSair: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
   botaoTema: { border: 'none', borderRadius: 30, padding: '8px 12px', fontSize: 20, cursor: 'pointer' },
-  atalhos: { display: 'flex', justifyContent: 'space-between', padding: 12, borderRadius: 12, marginBottom: 16, flexWrap: 'wrap', gap: 8 },
+  abas: { display: 'flex', gap: 8, marginBottom: 16 },
+  aba: { flex: 1, border: '1px solid', borderRadius: 8, padding: '8px 4px', fontSize: 12, cursor: 'pointer', textAlign: 'center' },
+  abaAtiva: { flex: 1, border: 'none', borderRadius: 8, padding: '8px 4px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer', textAlign: 'center' },
   busca: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, marginBottom: 12, boxSizing: 'border-box' },
-  ordemInfo: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 12, flexWrap: 'wrap', gap: 8 },
-  botaoLimparOrdem: { border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' },
   card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid' },
+  cardRota: { borderRadius: 12, padding: 16, marginBottom: 12, border: '2px solid #e2b96f' },
+  cardConcluido: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #27ae60' },
   nome: { fontWeight: 'bold', fontSize: 16, margin: '0 0 4px 0' },
   info: { fontSize: 13, margin: '0 0 2px 0' },
-  botaoIniciar: { border: 'none', borderRadius: 8, padding: '8px 12px', fontWeight: 'bold', cursor: 'pointer' },
-  botaoReordenar: { background: 'none', border: '1px solid', borderRadius: 4, padding: '2px 6px', cursor: 'pointer', fontSize: 12 },
-  cardRota: { backgroundColor: '#16213e', borderRadius: 12, padding: 20, marginBottom: 20, border: '2px solid', textAlign: 'center' },
-  proximos: { borderRadius: 12, padding: 12, marginBottom: 16, border: '1px solid' },
-  cardAssinatura: { borderRadius: 12, padding: 20, border: '1px solid' },
-  assinaturaInput: { width: '100%', border: '1px solid', borderRadius: 8, padding: 12, marginTop: 12, fontFamily: 'cursive', fontSize: 16 },
-  botaoConcluir: { border: 'none', borderRadius: 8, padding: '14px 20px', fontWeight: 'bold', cursor: 'pointer', width: '100%', marginBottom: 12 },
-  botaoVoltar: { border: 'none', borderRadius: 8, padding: '12px 20px', fontWeight: 'bold', cursor: 'pointer', width: '100%' },
-  vazio: { textAlign: 'center', marginTop: 40 }
+  botaoIniciar: { border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 'bold', cursor: 'pointer', fontSize: 18 },
+  botaoCheck: { border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 'bold', cursor: 'pointer', fontSize: 18 },
+  botaoSelecao: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
+  botaoGPS: { flex: 1, backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: 8, padding: '12px', fontWeight: 'bold', cursor: 'pointer' },
+  botaoConcluir: { flex: 1, backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '12px', fontWeight: 'bold', cursor: 'pointer' },
+  vazio: { textAlign: 'center', marginTop: 40 },
 };
