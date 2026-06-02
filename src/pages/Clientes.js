@@ -1,170 +1,125 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { useTema } from '../ThemeContext';
-import MenuADM from '../components/MenuADM';
 
 function copiar(texto, label) {
-  if (!texto || texto === 'null' || texto === 'undefined') {
-    alert('Nada para copiar');
-    return;
-  }
   navigator.clipboard.writeText(texto).then(() => alert(`${label} copiado!`));
 }
 
-function tratarCampo(valor) {
-  if (valor === null || valor === undefined || valor === 'null' || valor === 'undefined') {
-    return '';
-  }
-  return String(valor);
-}
-
-export default function Clientes({ onLogout, onStats, onRota, onImportarIfood }) {
+export default function Clientes({ onLogout }) {
   const [clientes, setClientes] = useState([]);
+  const [rotas, setRotas] = useState([]);
   const [busca, setBusca] = useState('');
   const [form, setForm] = useState(null);
-  const [filtroEspera, setFiltroEspera] = useState(false);
-  const { temaEscuro, alternarTema } = useTema();
+  const [aba, setAba] = useState('clientes');
 
-  async function carregar() {
-    const snap = await getDocs(collection(db, 'clientes'));
-    const lista = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        nome: tratarCampo(data.nome),
-        telefone: tratarCampo(data.telefone),
-        endereco: tratarCampo(data.endereco),
-        apt: tratarCampo(data.apt),
-        codigoEntrega: tratarCampo(data.codigoEntrega),
-        qtdPedidos: data.qtdPedidos || 0,
-        observacoes: tratarCampo(data.observacoes),
-        fixado: data.fixado === true ? true : false,
-        aguardandoProduto: data.aguardandoProduto || '',
-      };
+  useEffect(() => {
+    const unsub1 = onSnapshot(collection(db, 'clientes'), snap => {
+      setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    const ordenados = [...lista].sort((a, b) => {
-      if (a.fixado && !b.fixado) return -1;
-      if (!a.fixado && b.fixado) return 1;
-      return (a.nome || '').localeCompare(b.nome || '');
+    const unsub2 = onSnapshot(collection(db, 'rotas'), snap => {
+      setRotas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    setClientes(ordenados);
-  }
-
-  useEffect(() => { carregar(); }, []);
+    return () => { unsub1(); unsub2(); };
+  }, []);
 
   async function excluir(id) {
     if (window.confirm('Excluir este cliente?')) {
       await deleteDoc(doc(db, 'clientes', id));
-      await carregar();
     }
   }
 
   async function salvar(dados) {
-    const dadosParaSalvar = {
-      nome: tratarCampo(dados.nome),
-      telefone: tratarCampo(dados.telefone),
-      endereco: tratarCampo(dados.endereco),
-      apt: tratarCampo(dados.apt),
-      codigoEntrega: tratarCampo(dados.codigoEntrega),
-      qtdPedidos: Number(dados.qtdPedidos) || 0,
-      observacoes: tratarCampo(dados.observacoes),
-      fixado: dados.fixado === true ? true : false,
-      aguardandoProduto: dados.aguardandoProduto || '',
-    };
-
     if (dados.id) {
-      await updateDoc(doc(db, 'clientes', dados.id), dadosParaSalvar);
+      const { id, ...resto } = dados;
+      await updateDoc(doc(db, 'clientes', id), resto);
     } else {
-      await addDoc(collection(db, 'clientes'), dadosParaSalvar);
+      await addDoc(collection(db, 'clientes'), dados);
     }
     setForm(null);
-    await carregar();
   }
 
-  async function toggleFixado(id, fixadoAtual) {
-    const novoFixado = !fixadoAtual;
-    await updateDoc(doc(db, 'clientes', id), { fixado: novoFixado });
-    await carregar();
-  }
+  const filtrados = clientes.filter(c =>
+    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+    c.telefone?.includes(busca) ||
+    c.codigoEntrega?.includes(busca)
+  );
 
-  async function limparEspera(id) {
-    await updateDoc(doc(db, 'clientes', id), { aguardandoProduto: '' });
-    await carregar();
-  }
+  const rotasEmAndamento = rotas.filter(r => r.status === 'em_rota');
+  const rotasConcluidas = rotas.filter(r => r.status === 'concluida');
 
-  let listaFiltrada = clientes;
-  
-  if (busca.trim() !== '') {
-    listaFiltrada = clientes.filter(c =>
-      c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      c.telefone?.includes(busca) ||
-      c.codigoEntrega?.includes(busca)
-    );
-  }
-  
-  if (filtroEspera) {
-    listaFiltrada = listaFiltrada.filter(c => c.aguardandoProduto && c.aguardandoProduto !== '');
-  }
-
-  if (form !== null) {
-    return <FormCliente cliente={form} onSalvar={salvar} onCancelar={() => setForm(null)} />;
-  }
-
-  const cores = temaEscuro ? coresEscuro : coresClaro;
+  if (form !== null) return <FormCliente cliente={form} onSalvar={salvar} onCancelar={() => setForm(null)} />;
 
   return (
-    <div style={{ ...styles.container, backgroundColor: cores.fundo }}>
+    <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={{ ...styles.titulo, color: cores.destaque }}>🌾 Clientes</h1>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button style={{ ...styles.botaoAdd, backgroundColor: cores.destaque, color: cores.fundo }} onClick={() => setForm({ fixado: false, qtdPedidos: 0 })}>+ Novo</button>
-          <button style={{ ...styles.botaoEstatisticas, backgroundColor: cores.estats, color: '#fff' }} onClick={onStats}>📊 Stats</button>
-          <button 
-            onClick={() => setFiltroEspera(!filtroEspera)} 
-            style={{ ...styles.botaoEspera, backgroundColor: filtroEspera ? '#e67e22' : cores.card, color: filtroEspera ? '#fff' : cores.texto }}
-          >
-            ⏳ Lista de Espera
-          </button>
-          <MenuADM onLogout={onLogout} temaEscuro={temaEscuro} alternarTema={alternarTema} onRota={onRota} onImportarIfood={onImportarIfood} />
-        </div>
+        <h1 style={styles.titulo}>🌾 NossoGranel</h1>
+        <button style={styles.botaoLogout} onClick={onLogout}>Sair</button>
       </div>
-      <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} placeholder="Buscar por nome, telefone ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
-      
-      {listaFiltrada.map(c => (
-        <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: cores.borda }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-              <p style={{ ...styles.nome, color: cores.destaque }}>{c.nome || 'Sem nome'}</p>
-              <button onClick={() => toggleFixado(c.id, c.fixado)} style={c.fixado ? { ...styles.botaoFixadoAtivo, backgroundColor: cores.destaque, color: cores.fundo } : { ...styles.botaoFixar, backgroundColor: cores.botaoFixar, color: cores.textoSecundario }}>
-                {c.fixado ? '⭐ FIXADO' : '☆ FIXAR'}
-              </button>
-              {c.aguardandoProduto && (
-                <button onClick={() => limparEspera(c.id)} style={{ ...styles.botaoEsperaPequeno, backgroundColor: '#e67e22', color: '#fff' }}>
-                  ⏳ {c.aguardandoProduto}
-                </button>
-              )}
+
+      <div style={styles.abas}>
+        <button style={aba === 'clientes' ? styles.abaAtiva : styles.aba} onClick={() => setAba('clientes')}>👥 Clientes</button>
+        <button style={aba === 'rotas' ? styles.abaAtiva : styles.aba} onClick={() => setAba('rotas')}>🚚 Rotas {rotasEmAndamento.length > 0 && `(${rotasEmAndamento.length})`}</button>
+        <button style={aba === 'historico' ? styles.abaAtiva : styles.aba} onClick={() => setAba('historico')}>📋 Histórico</button>
+      </div>
+
+      {aba === 'clientes' && (
+        <>
+          <button style={styles.botaoAdd} onClick={() => setForm({})}>+ Novo Cliente</button>
+          <input style={styles.busca} placeholder="Buscar por nome, telefone ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
+          {filtrados.map(c => (
+            <div key={c.id} style={styles.card}>
+              <div style={{ flex: 1 }}>
+                <p style={styles.nome}>{c.nome}</p>
+                <p style={styles.info}>📞 <span style={styles.copiavel} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone}</span></p>
+                <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+                <p style={styles.info}>🔑 <span style={styles.copiavel} onClick={() => copiar(c.codigoEntrega, 'Código')}>{c.codigoEntrega}</span> | 🛒 {c.qtdPedidos}</p>
+                {c.observacoes && <p style={styles.info}>📝 {c.observacoes}</p>}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button style={styles.botaoEditar} onClick={() => setForm(c)}>✏️</button>
+                <button style={styles.botaoDeletar} onClick={() => excluir(c.id)}>🗑️</button>
+              </div>
             </div>
-            <p style={{ ...styles.info, color: cores.textoSecundario }}>📞 <span style={styles.copiavel} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone || '---'}</span></p>
-            <p style={{ ...styles.info, color: cores.textoSecundario }}>📍 {c.endereco || '---'}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-            <p style={{ ...styles.info, color: cores.textoSecundario }}>🔑 <span style={styles.copiavel} onClick={() => copiar(c.codigoEntrega, 'Código')}>{c.codigoEntrega || '---'}</span> | 🛒 Pedidos: {c.qtdPedidos || 0}</p>
-            {c.observacoes && <p style={{ ...styles.info, color: cores.textoSecundario }}>📝 {c.observacoes}</p>}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button style={{ ...styles.botaoEditar, backgroundColor: cores.botaoAcao }} onClick={() => setForm(c)}>✏️</button>
-            <button style={{ ...styles.botaoDeletar, backgroundColor: cores.botaoAcao }} onClick={() => excluir(c.id)}>🗑️</button>
-          </div>
-        </div>
-      ))}
-      {listaFiltrada.length === 0 && <p style={{ ...styles.vazio, color: cores.textoSecundario }}>Nenhum cliente encontrado.</p>}
+          ))}
+          {filtrados.length === 0 && <p style={styles.vazio}>Nenhum cliente encontrado.</p>}
+        </>
+      )}
+
+      {aba === 'rotas' && (
+        <>
+          <h3 style={{ color: '#e2b96f', marginBottom: 12 }}>🚚 Em Andamento</h3>
+          {rotasEmAndamento.length === 0 && <p style={styles.vazio}>Nenhuma rota em andamento.</p>}
+          {rotasEmAndamento.map(r => (
+            <div key={r.id} style={styles.cardRota}>
+              <p style={styles.nome}>{r.clienteNome}</p>
+              <p style={styles.info}>👤 Entregador: {r.entregador}</p>
+              <p style={styles.info}>🔑 Código: <span style={styles.copiavel} onClick={() => copiar(r.codigoEntrega, 'Código')}>{r.codigoEntrega}</span></p>
+              <p style={styles.info}>🕐 Iniciado: {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+            </div>
+          ))}
+        </>
+      )}
+
+      {aba === 'historico' && (
+        <>
+          <h3 style={{ color: '#e2b96f', marginBottom: 12 }}>📋 Entregas Concluídas</h3>
+          {rotasConcluidas.length === 0 && <p style={styles.vazio}>Nenhuma entrega concluída.</p>}
+          {rotasConcluidas.sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm)).map(r => (
+            <div key={r.id} style={styles.cardConcluido}>
+              <p style={styles.nome}>{r.clienteNome}</p>
+              <p style={styles.info}>👤 Entregador: {r.entregador}</p>
+              <p style={styles.info}>🔑 Código: {r.codigoEntrega}</p>
+              <p style={styles.info}>✅ Concluído: {new Date(r.concluidoEm).toLocaleString('pt-BR')}</p>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
 
 function FormCliente({ cliente, onSalvar, onCancelar }) {
-  const { temaEscuro } = useTema();
-  const cores = temaEscuro ? coresEscuro : coresClaro;
-
   const [dados, setDados] = useState({
     nome: cliente.nome || '',
     telefone: cliente.telefone || '',
@@ -173,119 +128,65 @@ function FormCliente({ cliente, onSalvar, onCancelar }) {
     codigoEntrega: cliente.codigoEntrega || '',
     qtdPedidos: cliente.qtdPedidos || 0,
     observacoes: cliente.observacoes || '',
-    fixado: cliente.fixado === true ? true : false,
-    aguardandoProduto: cliente.aguardandoProduto || '',
     id: cliente.id || null,
   });
 
   function handleChange(e) {
-    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setDados({ ...dados, [e.target.name]: value });
+    setDados({ ...dados, [e.target.name]: e.target.value });
   }
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!dados.nome.trim()) { 
-      alert('Nome é obrigatório!'); 
-      return; 
-    }
-    onSalvar(dados);
+    if (!dados.nome.trim()) { alert('Nome é obrigatório!'); return; }
+    onSalvar({ ...dados, qtdPedidos: parseInt(dados.qtdPedidos) || 0 });
   }
 
   return (
-    <div style={{ ...styles.container, backgroundColor: cores.fundo, minHeight: '100vh' }}>
-      <h2 style={{ ...styles.titulo, color: cores.destaque }}>{dados.id ? '✏️ Editar Cliente' : '➕ Novo Cliente'}</h2>
+    <div style={styles.container}>
+      <h2 style={styles.titulo}>{dados.id ? '✏️ Editar Cliente' : '➕ Novo Cliente'}</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 500 }}>
+        {[
+          { label: 'Nome *', name: 'nome', type: 'text' },
+          { label: 'Telefone', name: 'telefone', type: 'tel' },
+          { label: 'Endereço', name: 'endereco', type: 'text' },
+          { label: 'Apartamento', name: 'apt', type: 'text' },
+          { label: 'Código de Entrega', name: 'codigoEntrega', type: 'text' },
+          { label: 'Qtd. Pedidos', name: 'qtdPedidos', type: 'number' },
+        ].map(campo => (
+          <div key={campo.name}>
+            <label style={{ color: '#aaa', fontSize: 13 }}>{campo.label}</label>
+            <input style={styles.input} name={campo.name} type={campo.type} value={dados[campo.name]} onChange={handleChange} />
+          </div>
+        ))}
         <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Nome *</label>
-          <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} name="nome" type="text" value={dados.nome} onChange={handleChange} />
+          <label style={{ color: '#aaa', fontSize: 13 }}>Observações</label>
+          <textarea style={{ ...styles.input, height: 80 }} name="observacoes" value={dados.observacoes} onChange={handleChange} />
         </div>
-        <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Telefone</label>
-          <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} name="telefone" type="tel" value={dados.telefone} onChange={handleChange} />
-        </div>
-        <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Endereço</label>
-          <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} name="endereco" type="text" value={dados.endereco} onChange={handleChange} />
-        </div>
-        <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Apartamento</label>
-          <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} name="apt" type="text" value={dados.apt} onChange={handleChange} />
-        </div>
-        <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Código de Entrega</label>
-          <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} name="codigoEntrega" type="text" value={dados.codigoEntrega} onChange={handleChange} />
-        </div>
-        <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Qtd. Pedidos</label>
-          <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} name="qtdPedidos" type="number" value={dados.qtdPedidos} onChange={handleChange} />
-        </div>
-        <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Lista de Espera</label>
-          <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda }} name="aguardandoProduto" type="text" placeholder="Ex: Arroz 5kg, Feijão, Óleo..." value={dados.aguardandoProduto} onChange={handleChange} />
-        </div>
-        <div>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Observações</label>
-          <textarea style={{ ...styles.input, backgroundColor: cores.card, color: cores.texto, borderColor: cores.borda, height: 80 }} name="observacoes" value={dados.observacoes} onChange={handleChange} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <label style={{ color: cores.textoSecundario, fontSize: 13 }}>Fixar no topo:</label>
-          <label style={{ color: cores.destaque, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" name="fixado" checked={dados.fixado} onChange={handleChange} />
-            {dados.fixado ? '⭐ Cliente fixado' : '☆ Cliente normal'}
-          </label>
-        </div>
-        <button style={{ ...styles.botaoAdd, backgroundColor: cores.destaque, color: cores.fundo }} type="submit">💾 Salvar</button>
-        <button style={{ ...styles.botaoLogout, backgroundColor: cores.sair }} type="button" onClick={onCancelar}>Cancelar</button>
+        <button style={styles.botaoAdd} type="submit">💾 Salvar</button>
+        <button style={styles.botaoLogout} type="button" onClick={onCancelar}>Cancelar</button>
       </form>
     </div>
   );
 }
 
-const coresEscuro = {
-  fundo: '#1a1a2e',
-  card: '#16213e',
-  texto: '#fff',
-  textoSecundario: '#aaa',
-  borda: '#333',
-  destaque: '#e2b96f',
-  sair: '#c0392b',
-  estats: '#2980b9',
-  botaoFixar: '#2a2a4a',
-  botaoAcao: '#2a2a4a'
-};
-
-const coresClaro = {
-  fundo: '#f0f0f0',
-  card: '#ffffff',
-  texto: '#333333',
-  textoSecundario: '#666666',
-  borda: '#dddddd',
-  destaque: '#e2b96f',
-  sair: '#c0392b',
-  estats: '#2980b9',
-  botaoFixar: '#e0e0e0',
-  botaoAcao: '#e0e0e0'
-};
-
 const styles = {
-  container: { minHeight: '100vh', padding: 16 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20, flexWrap: 'wrap', gap: 10 },
-  titulo: { fontSize: 24, margin: 0 },
-  busca: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, marginBottom: 12, boxSizing: 'border-box' },
-  card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', border: '1px solid' },
-  nome: { fontWeight: 'bold', fontSize: 16, margin: 0 },
-  info: { fontSize: 13, margin: '0 0 2px' },
-  copiavel: { textDecoration: 'underline', cursor: 'pointer' },
-  input: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, fontSize: 15, boxSizing: 'border-box' },
-  botaoAdd: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
-  botaoLogout: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer', color: '#fff' },
-  botaoEditar: { border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, minWidth: 44, minHeight: 44 },
-  botaoDeletar: { border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, minWidth: 44, minHeight: 44 },
-  botaoFixar: { border: 'none', fontSize: 14, fontWeight: 'bold', cursor: 'pointer', padding: '8px 16px', borderRadius: 20, minWidth: 100, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  botaoFixadoAtivo: { border: 'none', fontSize: 14, fontWeight: 'bold', cursor: 'pointer', padding: '8px 16px', borderRadius: 20, minWidth: 100, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  botaoEstatisticas: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer', color: '#fff' },
-  botaoEspera: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
-  botaoEsperaPequeno: { border: 'none', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer', marginLeft: 8 },
-  vazio: { textAlign: 'center', marginTop: 40 },
+  container: { minHeight: '100vh', backgroundColor: '#1a1a2e', padding: 16 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20 },
+  titulo: { color: '#e2b96f', fontSize: 24, margin: 0 },
+  abas: { display: 'flex', gap: 8, marginBottom: 16 },
+  aba: { flex: 1, backgroundColor: '#16213e', color: '#aaa', border: '1px solid #2a2a4a', borderRadius: 8, padding: '8px 4px', fontSize: 13, cursor: 'pointer' },
+  abaAtiva: { flex: 1, backgroundColor: '#e2b96f', color: '#1a1a2e', border: 'none', borderRadius: 8, padding: '8px 4px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer' },
+  busca: { width: '100%', backgroundColor: '#16213e', color: '#fff', border: '1px solid #333', borderRadius: 10, padding: 12, marginBottom: 12, boxSizing: 'border-box' },
+  card: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', border: '1px solid #2a2a4a' },
+  cardRota: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #e2b96f' },
+  cardConcluido: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #27ae60' },
+  nome: { color: '#e2b96f', fontWeight: 'bold', fontSize: 16, margin: '0 0 4px' },
+  info: { color: '#ccc', fontSize: 13, margin: '0 0 2px' },
+  copiavel: { color: '#e2b96f', textDecoration: 'underline', cursor: 'pointer' },
+  input: { width: '100%', backgroundColor: '#16213e', color: '#fff', border: '1px solid #2a2a4a', borderRadius: 10, padding: 12, fontSize: 15, boxSizing: 'border-box' },
+  botaoAdd: { backgroundColor: '#e2b96f', color: '#1a1a2e', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: 12 },
+  botaoLogout: { backgroundColor: '#c0392b', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer' },
+  botaoEditar: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' },
+  botaoDeletar: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' },
+  vazio: { color: '#888', textAlign: 'center', marginTop: 40 },
 };

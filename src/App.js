@@ -1,29 +1,12 @@
 import React, { useState } from 'react';
 import Login from './pages/Login';
 import Clientes from './pages/Clientes';
-import Estatisticas from './pages/Estatisticas';
-import RotaEntrega from './pages/RotaEntrega';
-import ImportarIfood from './pages/ImportarIfood';
+import EntregadorHome from './pages/EntregadorHome';
 
 export default function App() {
-  const [logado, setLogado] = useState(false);
-  const [pagina, setPagina] = useState('clientes');
+  const [usuario, setUsuario] = useState(null);
 
-  if (!logado) {
-    return <Login onLogin={() => setLogado(true)} />;
-  }
-
-  if (pagina === 'estatisticas') {
-    return <Estatisticas onVoltar={() => setPagina('clientes')} />;
-  }
-
-  if (pagina === 'rota') {
-    return <RotaEntrega onVoltar={() => setPagina('clientes')} />;
-  }
-
-  if (pagina === 'importarIfood') {
-    return <ImportarIfood onVoltar={() => setPagina('clientes')} />;
-  }
-
-  return <Clientes onLogout={() => setLogado(false)} onStats={() => setPagina('estatisticas')} onRota={() => setPagina('rota')} onImportarIfood={() => setPagina('importarIfood')} />;
+  if (!usuario) return <Login onLogin={setUsuario} />;
+  if (usuario.tipo === 'adm') return <Clientes onLogout={() => setUsuario(null)} />;
+  if (usuario.tipo === 'entregador') return <EntregadorHome usuario={usuario} onLogout={() => setUsuario(null)} />;
 }
