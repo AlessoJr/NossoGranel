@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { getClientesRealtime, iniciarRota, concluirRota, getRotasRealtime, atualizarLocalizacao } from '../services/firebaseService';
+import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
@@ -23,12 +24,9 @@ export default function EntregadorHome({ usuario, onLogout }) {
     const unsub1 = getClientesRealtime(setClientes);
     const unsub2 = getRotasRealtime(setRotas);
 
-    // Rastreamento GPS contínuo
     if (navigator.geolocation) {
       watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          atualizarLocalizacao(usuario.nome, pos.coords.latitude, pos.coords.longitude);
-        },
+        (pos) => atualizarLocalizacao(usuario.nome, pos.coords.latitude, pos.coords.longitude),
         (err) => console.log('GPS erro:', err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
       );
@@ -49,13 +47,13 @@ export default function EntregadorHome({ usuario, onLogout }) {
     c?.codigoEntrega?.includes(busca)
   );
 
-  function toggleSelecionar(clienteId) {
+  const toggleSelecionar = (clienteId) => {
     setSelecionados(prev =>
       prev.includes(clienteId) ? prev.filter(id => id !== clienteId) : [...prev, clienteId]
     );
-  }
+  };
 
-  async function iniciarRotasSelecionadas() {
+  const iniciarRotasSelecionadas = async () => {
     if (selecionados.length === 0) { toast.warning('Selecione ao menos um cliente!'); return; }
     for (const id of selecionados) {
       const cliente = clientes.find(c => c.id === id);
@@ -68,25 +66,38 @@ export default function EntregadorHome({ usuario, onLogout }) {
     setModoSelecao(false);
     setAba('rotas');
     toast.success(`${selecionados.length} rota(s) iniciada(s)!`);
-  }
+  };
 
-  async function handleConcluirRota(rota) {
+  const handleConcluirRota = async (rota) => {
     if (!window.confirm(`Concluir entrega de ${rota.clienteNome}?`)) return;
     await concluirRota(rota.id, rota.codigoEntrega);
     toast.success(`✅ Entrega de ${rota.clienteNome} concluída!`);
-  }
+  };
+
+  const handleNavigate = (pagina) => {
+    setAba(pagina);
+  };
+
+  const perfilEntregador = { nome: usuario.nome, tipo: 'entregador' };
 
   return (
     <div style={{ ...styles.container, backgroundColor: cores.background }}>
       <div style={styles.header}>
-        <h1 style={{ ...styles.titulo, color: cores.primary }}>🚚 {usuario.nome}</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ ...styles.botaoTema, backgroundColor: cores.card, color: cores.text }} onClick={toggleTheme}>🌓</button>
-          <button style={{ ...styles.botaoSair, backgroundColor: '#c0392b', color: '#fff' }} onClick={onLogout}>Sair</button>
-        </div>
+        <h1 style={{ ...styles.titulo, color: cores.primary }}>🚚 NossoGranel</h1>
+        <ProfileMenu 
+          usuario={perfilEntregador}
+          onLogout={onLogout}
+          toggleTheme={toggleTheme}
+          onNavigate={handleNavigate}
+        />
       </div>
 
-      <div style={styles.abas}>
+      <div style={{ ...styles.atalhos, backgroundColor: cores.card }}>
+        <span style={{ color: cores.text }}>📅 {new Date().toLocaleDateString('pt-BR')}</span>
+        <span style={{ color: cores.text }}>🎯 Meta: 15 entregas/dia</span>
+      </div>
+
+      <div style={styles.subAbas}>
         <button style={aba === 'clientes' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('clientes')}>👥 Clientes</button>
         <button style={aba === 'rotas' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('rotas')}>🚚 Em Rota ({minhasRotas.length})</button>
         <button style={aba === 'concluidas' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('concluidas')}>✅ Concluídas ({minhasConcluidas.length})</button>
@@ -123,7 +134,7 @@ export default function EntregadorHome({ usuario, onLogout }) {
                   <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {c.telefone}</p>
                   <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 {c.codigoEntrega}</p>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div>
                   {modoSelecao ? (
                     <button
                       style={{ ...styles.botaoCheck, backgroundColor: selecionado ? '#27ae60' : cores.cardBorder, color: '#fff' }}
@@ -157,7 +168,7 @@ export default function EntregadorHome({ usuario, onLogout }) {
               <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
               <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {r.clienteTelefone}</p>
               <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: <strong style={{ color: cores.primary, fontSize: 20 }}>{r.codigoEntrega}</strong></p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Iniciado: {new Date(r.iniciadoEm).toLocaleString()}</p>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button style={styles.botaoGPS} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 GPS</button>
                 <button style={styles.botaoConcluir} onClick={() => handleConcluirRota(r)}>✅ Concluir</button>
@@ -175,8 +186,8 @@ export default function EntregadorHome({ usuario, onLogout }) {
             <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card }}>
               <p style={{ ...styles.nome, color: cores.primary }}>{r.clienteNome}</p>
               <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: <strong style={{ color: '#27ae60' }}>{r.codigoEntrega}</strong></p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Iniciado: {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
-              <p style={{ ...styles.info, color: '#27ae60' }}>✅ Concluído: {new Date(r.concluidoEm).toLocaleString('pt-BR')}</p>
+              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Início: {new Date(r.iniciadoEm).toLocaleString()}</p>
+              <p style={{ ...styles.info, color: '#27ae60' }}>✅ Conclusão: {new Date(r.concluidoEm).toLocaleString()}</p>
             </div>
           ))}
         </>
@@ -187,23 +198,22 @@ export default function EntregadorHome({ usuario, onLogout }) {
 
 const styles = {
   container: { minHeight: '100vh', padding: 16 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20 },
-  titulo: { fontSize: 22, margin: 0 },
-  botaoSair: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
-  botaoTema: { border: 'none', borderRadius: 30, padding: '8px 12px', fontSize: 20, cursor: 'pointer' },
-  abas: { display: 'flex', gap: 8, marginBottom: 16 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20, flexWrap: 'wrap', gap: 10 },
+  titulo: { fontSize: 24, margin: 0 },
+  atalhos: { display: 'flex', gap: 8, marginBottom: 16, padding: 12, borderRadius: 12, flexWrap: 'wrap', justifyContent: 'center' },
+  subAbas: { display: 'flex', gap: 8, marginBottom: 16 },
   aba: { flex: 1, border: '1px solid', borderRadius: 8, padding: '8px 4px', fontSize: 12, cursor: 'pointer', textAlign: 'center' },
   abaAtiva: { flex: 1, border: 'none', borderRadius: 8, padding: '8px 4px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer', textAlign: 'center' },
   busca: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, marginBottom: 12, boxSizing: 'border-box' },
-  card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid' },
-  cardRota: { borderRadius: 12, padding: 16, marginBottom: 12, border: '2px solid #e2b96f' },
+  card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid' },
+  cardRota: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #e2b96f' },
   cardConcluido: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #27ae60' },
   nome: { fontWeight: 'bold', fontSize: 16, margin: '0 0 4px 0' },
   info: { fontSize: 13, margin: '0 0 2px 0' },
-  botaoIniciar: { border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 'bold', cursor: 'pointer', fontSize: 18 },
-  botaoCheck: { border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 'bold', cursor: 'pointer', fontSize: 18 },
+  botaoIniciar: { border: 'none', borderRadius: 8, padding: '8px 12px', fontWeight: 'bold', cursor: 'pointer' },
   botaoSelecao: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
-  botaoGPS: { flex: 1, backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: 8, padding: '12px', fontWeight: 'bold', cursor: 'pointer' },
-  botaoConcluir: { flex: 1, backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '12px', fontWeight: 'bold', cursor: 'pointer' },
-  vazio: { textAlign: 'center', marginTop: 40 },
+  botaoCheck: { border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 16, cursor: 'pointer', minWidth: 44 },
+  botaoGPS: { flex: 1, backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontWeight: 'bold', cursor: 'pointer' },
+  botaoConcluir: { flex: 1, backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontWeight: 'bold', cursor: 'pointer' },
+  vazio: { textAlign: 'center', marginTop: 40 }
 };

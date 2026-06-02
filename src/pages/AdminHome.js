@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getClientesRealtime, getRotasRealtime, salvarCliente, excluirCliente, excluirRota, iniciarRota, getLocalizacoesRealtime } from '../services/firebaseService';
 import FormCliente from '../components/FormCliente';
 import AdminConfiguracoes from './AdminConfiguracoes';
+import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
@@ -43,10 +44,6 @@ export default function AdminHome({ onLogout }) {
           notificadasRef.current.add(r.id);
           toast.success(`✅ ${r.clienteNome} entregue por ${r.entregador} — Código: ${r.codigoEntrega}`);
         });
-        novasRotas.filter(r => r.status === 'em_andamento' && !notificadasRef.current.has('rota_' + r.id)).forEach(r => {
-          notificadasRef.current.add('rota_' + r.id);
-          toast.info(`🚚 ${r.entregador} iniciou rota para ${r.clienteNome}`);
-        });
       }
       setRotas(novasRotas);
     });
@@ -84,6 +81,16 @@ export default function AdminHome({ onLogout }) {
 
   const entregadoresAtivos = [...new Set(rotasEmAndamento.map(r => r.entregador))];
 
+  const perfilAdmin = { nome: 'Administrador', tipo: 'admin' };
+
+  const handleNavigate = (pagina) => {
+    if (pagina === 'configuracoes') {
+      setShowConfig(true);
+    } else {
+      setAba(pagina);
+    }
+  };
+
   if (showConfig) return <AdminConfiguracoes onVoltar={() => setShowConfig(false)} />;
   if (formAberto) return <FormCliente cliente={clienteEditando} onSalvar={handleSalvarCliente} onCancelar={() => { setFormAberto(false); setClienteEditando(null); }} />;
 
@@ -91,17 +98,18 @@ export default function AdminHome({ onLogout }) {
     <div style={{ ...styles.container, backgroundColor: cores.background }}>
       <div style={styles.header}>
         <h1 style={{ ...styles.titulo, color: cores.primary }}>🌾 NossoGranel</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ ...styles.botaoTema, backgroundColor: cores.card, color: cores.text }} onClick={toggleTheme}>🌓</button>
-        </div>
+        <ProfileMenu 
+          usuario={perfilAdmin}
+          onLogout={onLogout}
+          toggleTheme={toggleTheme}
+          onNavigate={handleNavigate}
+        />
       </div>
 
       <div style={{ ...styles.atalhos, backgroundColor: cores.card }}>
-        <button style={{ ...styles.atalhoBotao, backgroundColor: cores.primary, color: cores.background }} onClick={() => { setClienteEditando(null); setFormAberto(true); }}>➕ Novo</button>
-        <button style={{ ...styles.atalhoBotao, backgroundColor: cores.primary, color: cores.background }} onClick={() => setAba('rotas')}>🚚 Rotas {rotasEmAndamento.length > 0 && `(${rotasEmAndamento.length})`}</button>
+        <button style={{ ...styles.atalhoBotao, backgroundColor: cores.primary, color: cores.background }} onClick={() => { setClienteEditando(null); setFormAberto(true); }}>➕ Novo Cliente</button>
+        <button style={{ ...styles.atalhoBotao, backgroundColor: cores.primary, color: cores.background }} onClick={() => setAba('rotas')}>🚚 Ver Rotas</button>
         <button style={{ ...styles.atalhoBotao, backgroundColor: cores.primary, color: cores.background }} onClick={() => setAba('entregadores')}>📍 Entregadores</button>
-        <button style={{ ...styles.atalhoBotao, backgroundColor: cores.primary, color: cores.background }} onClick={() => setShowConfig(true)}>⚙️</button>
-        <button style={{ ...styles.atalhoBotao, backgroundColor: '#c0392b', color: '#fff' }} onClick={onLogout}>🚪</button>
       </div>
 
       {clientesInativos.length > 0 && (
@@ -110,13 +118,15 @@ export default function AdminHome({ onLogout }) {
         </div>
       )}
 
-      <div style={styles.abas}>
-        <button style={aba === 'clientes' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('clientes')}>👥 ({clientes.length})</button>
-        <button style={aba === 'rotas' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('rotas')}>🚚 ({rotasEmAndamento.length})</button>
-        <button style={aba === 'historico' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('historico')}>📋 ({rotasConcluidas.length})</button>
-        <button style={aba === 'entregadores' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('entregadores')}>📍 ({entregadoresAtivos.length})</button>
+      {/* Abas visíveis (agora são apenas filtros visuais, o menu principal está no perfil) */}
+      <div style={styles.subAbas}>
+        <button style={aba === 'clientes' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('clientes')}>👥 Clientes ({clientes.length})</button>
+        <button style={aba === 'rotas' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('rotas')}>🚚 Em Rota ({rotasEmAndamento.length})</button>
+        <button style={aba === 'historico' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('historico')}>📋 Histórico ({rotasConcluidas.length})</button>
+        <button style={aba === 'entregadores' ? { ...styles.abaAtiva, backgroundColor: cores.primary, color: cores.background } : { ...styles.aba, backgroundColor: cores.card, color: cores.text }} onClick={() => setAba('entregadores')}>📍 Ativos ({entregadoresAtivos.length})</button>
       </div>
 
+      {/* Conteúdo das abas (mesmo de antes) */}
       {aba === 'clientes' && (
         <>
           <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar por nome, telefone ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
@@ -150,7 +160,7 @@ export default function AdminHome({ onLogout }) {
 
       {aba === 'rotas' && (
         <>
-          <h3 style={{ color: cores.primary, marginBottom: 12 }}>🚚 Em Andamento</h3>
+          <h3 style={{ color: cores.primary, marginBottom: 12 }}>🚚 Entregas em Andamento</h3>
           {rotasEmAndamento.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhuma rota em andamento.</p>}
           {rotasEmAndamento.map(r => {
             const locEntregador = localizacoes.find(l => l.entregador === r.entregador);
@@ -159,10 +169,10 @@ export default function AdminHome({ onLogout }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <div style={{ flex: 1 }}>
                     <p style={{ ...styles.nome, color: cores.primary }}>{r.clienteNome}</p>
-                    <p style={{ ...styles.info, color: cores.textSecondary }}>👤 <strong style={{ color: cores.primary }}>{r.entregador}</strong></p>
+                    <p style={{ ...styles.info, color: cores.textSecondary }}>👤 <strong>{r.entregador}</strong></p>
                     <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
-                    <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 <span style={styles.copiavel} onClick={() => copiar(r.codigoEntrega, 'Código')}>{r.codigoEntrega}</span></p>
-                    <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
+                    <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 {r.codigoEntrega}</p>
+                    <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 {new Date(r.iniciadoEm).toLocaleString()}</p>
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                       <button style={styles.botaoGPS} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 Destino</button>
                       {locEntregador && (
@@ -171,11 +181,6 @@ export default function AdminHome({ onLogout }) {
                         </button>
                       )}
                     </div>
-                    {locEntregador && (
-                      <p style={{ ...styles.info, color: '#27ae60', marginTop: 4 }}>
-                        📡 Atualizado: {new Date(locEntregador.atualizadoEm).toLocaleTimeString('pt-BR')}
-                      </p>
-                    )}
                   </div>
                   <button style={{ ...styles.botaoDeletar, backgroundColor: cores.cardBorder }} onClick={async () => { if (window.confirm('Excluir rota?')) await excluirRota(r.id); }}>🗑️</button>
                 </div>
@@ -187,7 +192,7 @@ export default function AdminHome({ onLogout }) {
 
       {aba === 'historico' && (
         <>
-          <h3 style={{ color: cores.primary, marginBottom: 12 }}>📋 Concluídas</h3>
+          <h3 style={{ color: cores.primary, marginBottom: 12 }}>📋 Entregas Concluídas</h3>
           {rotasConcluidas.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhuma entrega concluída.</p>}
           {rotasConcluidas.map(r => (
             <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card }}>
@@ -195,9 +200,9 @@ export default function AdminHome({ onLogout }) {
                 <div style={{ flex: 1 }}>
                   <p style={{ ...styles.nome, color: cores.primary }}>{r.clienteNome}</p>
                   <p style={{ ...styles.info, color: cores.textSecondary }}>👤 {r.entregador}</p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 <span style={styles.copiavel} onClick={() => copiar(r.codigoEntrega, 'Código')}>{r.codigoEntrega}</span></p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 {new Date(r.iniciadoEm).toLocaleString('pt-BR')}</p>
-                  <p style={{ ...styles.info, color: '#27ae60' }}>✅ {new Date(r.concluidoEm).toLocaleString('pt-BR')}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 {r.codigoEntrega}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Início: {new Date(r.iniciadoEm).toLocaleString()}</p>
+                  <p style={{ ...styles.info, color: '#27ae60' }}>✅ Conclusão: {new Date(r.concluidoEm).toLocaleString()}</p>
                 </div>
                 <button style={{ ...styles.botaoDeletar, backgroundColor: cores.cardBorder }} onClick={async () => { if (window.confirm('Excluir?')) await excluirRota(r.id); }}>🗑️</button>
               </div>
@@ -213,16 +218,11 @@ export default function AdminHome({ onLogout }) {
           {localizacoes.map(l => {
             const rotasDoEntregador = rotasEmAndamento.filter(r => r.entregador === l.entregador);
             return (
-              <div key={l.id} style={{ ...styles.cardEntregador, backgroundColor: cores.card, borderColor: rotasDoEntregador.length > 0 ? '#27ae60' : cores.cardBorder }}>
+              <div key={l.id} style={{ ...styles.cardEntregador, backgroundColor: cores.card }}>
                 <p style={{ ...styles.nome, color: cores.primary }}>👤 {l.entregador}</p>
                 <p style={{ ...styles.info, color: cores.textSecondary }}>🚚 {rotasDoEntregador.length} entrega(s) em andamento</p>
-                <p style={{ ...styles.info, color: '#27ae60' }}>📡 Última atualização: {new Date(l.atualizadoEm).toLocaleTimeString('pt-BR')}</p>
-                {rotasDoEntregador.map(r => (
-                  <p key={r.id} style={{ ...styles.info, color: cores.textSecondary }}>• {r.clienteNome} — 🔑 {r.codigoEntrega}</p>
-                ))}
-                <button style={{ ...styles.botaoEntregador, marginTop: 10 }} onClick={() => abrirLocalizacaoEntregador(l.lat, l.lng)}>
-                  📍 Ver localização no mapa
-                </button>
+                <p style={{ ...styles.info, color: '#27ae60' }}>📡 Atualizado: {new Date(l.atualizadoEm).toLocaleTimeString()}</p>
+                <button style={styles.botaoEntregador} onClick={() => abrirLocalizacaoEntregador(l.lat, l.lng)}>📍 Ver no mapa</button>
               </div>
             );
           })}
@@ -234,20 +234,19 @@ export default function AdminHome({ onLogout }) {
 
 const styles = {
   container: { minHeight: '100vh', padding: 16 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20, flexWrap: 'wrap', gap: 10 },
   titulo: { fontSize: 24, margin: 0 },
-  botaoTema: { border: 'none', borderRadius: 30, padding: '8px 12px', fontSize: 20, cursor: 'pointer' },
   atalhos: { display: 'flex', gap: 8, marginBottom: 16, padding: 12, borderRadius: 12, flexWrap: 'wrap', justifyContent: 'center' },
   atalhoBotao: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
   aviso: { border: '1px solid', borderRadius: 8, padding: 8, marginBottom: 16, textAlign: 'center' },
-  abas: { display: 'flex', gap: 8, marginBottom: 16 },
+  subAbas: { display: 'flex', gap: 8, marginBottom: 16 },
   aba: { flex: 1, border: '1px solid', borderRadius: 8, padding: '8px 4px', fontSize: 12, cursor: 'pointer', textAlign: 'center' },
   abaAtiva: { flex: 1, border: 'none', borderRadius: 8, padding: '8px 4px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer', textAlign: 'center' },
   busca: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, marginBottom: 12, boxSizing: 'border-box' },
   card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', border: '1px solid' },
   cardRota: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #e2b96f' },
   cardConcluido: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #27ae60' },
-  cardEntregador: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid' },
+  cardEntregador: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #8e44ad' },
   nome: { fontWeight: 'bold', fontSize: 16, margin: '0 0 4px 0' },
   info: { fontSize: 13, margin: '0 0 2px 0' },
   copiavel: { textDecoration: 'underline', cursor: 'pointer' },
@@ -255,6 +254,6 @@ const styles = {
   botaoDeletar: { border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px 10px', borderRadius: 8 },
   botaoRota: { backgroundColor: '#27ae60', color: '#fff', border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px 10px', borderRadius: 8 },
   botaoGPS: { flex: 1, backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer' },
-  botaoEntregador: { flex: 1, backgroundColor: '#8e44ad', color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer', width: '100%' },
-  vazio: { textAlign: 'center', marginTop: 40 },
+  botaoEntregador: { flex: 1, backgroundColor: '#8e44ad', color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer' },
+  vazio: { textAlign: 'center', marginTop: 40 }
 };
