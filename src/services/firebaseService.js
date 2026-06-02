@@ -92,3 +92,27 @@ export const getConfiguracoes = async () => {
 export const salvarConfiguracoes = async (config) => {
   await setDoc(doc(db, 'configuracoes', 'geral'), config);
 };
+
+// ENTREGADORES
+export const getEntregadores = (callback) => {
+  // Por enquanto, lista fixa de entregadores
+  // Você pode expandir para buscar do Firebase Auth
+  callback(['Entregador']);
+};
+
+// ATUALIZAR LOCALIZAÇÃO
+export const atualizarLocalizacao = async (entregador, lat, lng) => {
+  const localizacaoRef = doc(db, 'localizacoes', entregador);
+  await setDoc(localizacaoRef, {
+    entregador,
+    lat,
+    lng,
+    atualizadoEm: new Date().toISOString()
+  });
+};
+
+export const getLocalizacoesRealtime = (callback) => {
+  return onSnapshot(collection(db, 'localizacoes'), (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+};
