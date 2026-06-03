@@ -19,7 +19,6 @@ function abrirLocalizacaoEntregador(lat, lng) {
   window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
 }
 
-// Chave única para notificações já mostradas
 const NOTIFICACOES_VISTAS_KEY = 'admin_notificacoes_vistas';
 
 export default function AdminHome({ onLogout }) {
@@ -36,7 +35,6 @@ export default function AdminHome({ onLogout }) {
   const [showConfig, setShowConfig] = useState(false);
   const [entregadorSelecionado, setEntregadorSelecionado] = useState('');
   
-  // Recupera notificações já mostradas na sessão
   const getNotificacoesVistas = () => {
     const saved = sessionStorage.getItem(NOTIFICACOES_VISTAS_KEY);
     return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -71,9 +69,7 @@ export default function AdminHome({ onLogout }) {
         }
       });
       
-      if (atualizado) {
-        salvarNotificacoesVistas(notificadas);
-      }
+      if (atualizado) salvarNotificacoesVistas(notificadas);
       setRotas(novasRotas);
     });
     
@@ -127,12 +123,16 @@ export default function AdminHome({ onLogout }) {
             <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar..." value={busca} onChange={e => setBusca(e.target.value)} />
           </div>
           {clientesFiltrados.map(c => {
+            // Verifica se existe uma rota EM ANDAMENTO para este cliente
             const rotaAtiva = rotasEmAndamento.find(r => r.clienteId === c.id);
             const isEmRota = !!rotaAtiva;
             return (
               <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: isEmRota ? cores.success : cores.cardBorder, borderWidth: isEmRota ? 2 : 1 }}>
                 <div style={{ flex: 1 }}>
-                  <p style={{ ...styles.nome, color: cores.primary }}>{c.nome} {isEmRota && <span style={{ fontSize: 11, color: cores.success }}>🚚 {rotaAtiva.entregador}</span>}</p>
+                  <p style={{ ...styles.nome, color: cores.primary }}>
+                    {c.nome} 
+                    {isEmRota && <span style={{ fontSize: 11, color: cores.success, marginLeft: 8 }}>🚚 {rotaAtiva.entregador}</span>}
+                  </p>
                   <p style={{ ...styles.info, color: cores.textSecondary }}>📞 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone}</span></p>
                   <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
                   <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.codigoEntrega, 'Código')}>{c.codigoEntrega}</span> | 🛒 {c.qtdPedidos}</p>

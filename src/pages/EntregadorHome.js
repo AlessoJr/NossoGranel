@@ -9,7 +9,6 @@ function abrirGPS(endereco, apt) {
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(end)}`, '_blank');
 }
 
-// Chave única para notificações já mostradas
 const NOTIFICACOES_VISTAS_KEY = 'entregador_notificacoes_vistas';
 
 export default function EntregadorHome({ usuario, onLogout }) {
@@ -21,7 +20,6 @@ export default function EntregadorHome({ usuario, onLogout }) {
   const [aba, setAba] = useState('rotas');
   const watchIdRef = useRef(null);
 
-  // Recupera notificações já mostradas na sessão
   const getNotificacoesVistas = () => {
     const saved = sessionStorage.getItem(NOTIFICACOES_VISTAS_KEY);
     return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -46,9 +44,7 @@ export default function EntregadorHome({ usuario, onLogout }) {
         }
       });
       
-      if (atualizado) {
-        salvarNotificacoesVistas(notificadas);
-      }
+      if (atualizado) salvarNotificacoesVistas(notificadas);
       setRotas(novasRotas);
     });
 
@@ -68,11 +64,7 @@ export default function EntregadorHome({ usuario, onLogout }) {
   }, [usuario.nome]);
 
   const handleAtivarRota = async (cliente) => {
-    const jaExiste = rotas.some(r => r.clienteId === cliente.id && r.status === 'em_andamento' && r.entregador === usuario.nome);
-    if (jaExiste) {
-      toast.warning('Você já tem uma rota ativa para este cliente!');
-      return;
-    }
+    // REMOVIDO: não bloqueia mais se já tem rota ativa
     await criarRota(cliente, usuario.nome, 'entregador');
     toast.success(`Rota ativada para ${cliente.nome}!`);
     setAba('rotas');
@@ -115,10 +107,7 @@ export default function EntregadorHome({ usuario, onLogout }) {
                   <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {c.telefone}</p>
                   <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 {c.codigoEntrega}</p>
                 </div>
-                {!rotaAtiva && (
-                  <button style={{ ...styles.botaoAtivar, backgroundColor: cores.primary, color: cores.background }} onClick={() => handleAtivarRota(c)}>🚚 Ativar</button>
-                )}
-                {rotaAtiva && <span style={{ fontSize: 12, color: cores.success }}>✅ Em rota</span>}
+                <button style={{ ...styles.botaoAtivar, backgroundColor: cores.primary, color: cores.background }} onClick={() => handleAtivarRota(c)}>🚚 Ativar</button>
               </div>
             );
           })}
