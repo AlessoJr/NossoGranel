@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getClientesRealtime, getRotasRealtime, salvarCliente, excluirCliente, excluirRota, criarRota, getLocalizacoesRealtime, getEntregadores } from '../services/firebaseService';
 import FormCliente from '../components/FormCliente';
 import AdminConfiguracoes from './AdminConfiguracoes';
@@ -19,6 +19,9 @@ function abrirLocalizacaoEntregador(lat, lng) {
   window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
 }
 
+// Chave única para notificações já mostradas
+const NOTIFICACOES_VISTAS_KEY = 'admin_notificacoes_vistas';
+
 export default function AdminHome({ onLogout }) {
   const { darkMode, toggleTheme } = useTheme();
   const cores = getTheme(darkMode);
@@ -32,24 +35,48 @@ export default function AdminHome({ onLogout }) {
   const [clienteEditando, setClienteEditando] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
   const [entregadorSelecionado, setEntregadorSelecionado] = useState('');
-  const notificadasRef = useRef(new Set());
+  
+  // Recupera notificações já mostradas na sessão
+  const getNotificacoesVistas = () => {
+    const saved = sessionStorage.getItem(NOTIFICACOES_VISTAS_KEY);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  };
+  
+  const salvarNotificacoesVistas = (set) => {
+    sessionStorage.setItem(NOTIFICACOES_VISTAS_KEY, JSON.stringify([...set]));
+  };
 
   useEffect(() => {
     getEntregadores(setEntregadores);
     const unsub1 = getClientesRealtime(setClientes);
+    
     const unsub2 = getRotasRealtime((novasRotas) => {
+      const notificadas = getNotificacoesVistas();
+      let atualizado = false;
+      
       novasRotas.forEach(r => {
-        if (r.status === 'em_andamento' && r.criadoPor === 'entregador' && !notificadasRef.current.has(r.id)) {
-          notificadasRef.current.add(r.id);
-          toast.info(`🔔 ${r.entregador} ativou rota para ${r.clienteNome}`);
-        }
-        if (r.status === 'concluida' && !notificadasRef.current.has(`concluida_${r.id}`)) {
-          notificadasRef.current.add(`concluida_${r.id}`);
+        const idConcluida = `concluida_${r.id}`;
+        const idAtivada = `ativada_${r.id}`;
+        
+        if (r.status === 'concluida' && !notificadas.has(idConcluida)) {
+          notificadas.add(idConcluida);
+          atualizado = true;
           toast.success(`✅ ${r.clienteNome} entregue por ${r.entregador}`);
         }
+        
+        if (r.status === 'em_andamento' && r.criadoPor === 'entregador' && !notificadas.has(idAtivada)) {
+          notificadas.add(idAtivada);
+          atualizado = true;
+          toast.info(`🔔 ${r.entregador} ativou rota para ${r.clienteNome}`);
+        }
       });
+      
+      if (atualizado) {
+        salvarNotificacoesVistas(notificadas);
+      }
       setRotas(novasRotas);
     });
+    
     const unsub3 = getLocalizacoesRealtime(setLocalizacoes);
     return () => { unsub1(); unsub2(); unsub3(); };
   }, []);
