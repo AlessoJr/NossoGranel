@@ -38,7 +38,6 @@ export default function AdminHome({ onLogout }) {
     getEntregadores(setEntregadores);
     const unsub1 = getClientesRealtime(setClientes);
     const unsub2 = getRotasRealtime((novasRotas) => {
-      // Notificar apenas rotas novas (não repetir)
       novasRotas.forEach(r => {
         if (r.status === 'em_andamento' && r.criadoPor === 'entregador' && !notificadasRef.current.has(r.id)) {
           notificadasRef.current.add(r.id);
@@ -107,18 +106,18 @@ export default function AdminHome({ onLogout }) {
               <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: isEmRota ? cores.success : cores.cardBorder, borderWidth: isEmRota ? 2 : 1 }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ ...styles.nome, color: cores.primary }}>{c.nome} {isEmRota && <span style={{ fontSize: 11, color: cores.success }}>🚚 {rotaAtiva.entregador}</span>}</p>
-                  <p style={styles.info}>📞 <span style={styles.copiavel} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone}</span></p>
-                  <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-                  <p style={styles.info}>🔑 {c.codigoEntrega} | 🛒 {c.qtdPedidos}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>📞 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone}</span></p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.codigoEntrega, 'Código')}>{c.codigoEntrega}</span> | 🛒 {c.qtdPedidos}</p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <select style={styles.select} value={entregadorSelecionado} onChange={(e) => setEntregadorSelecionado(e.target.value)}>
+                  <select style={{ ...styles.select, backgroundColor: cores.cardBorder, color: cores.text }} value={entregadorSelecionado} onChange={(e) => setEntregadorSelecionado(e.target.value)}>
                     <option value="">Entregador</option>
                     {entregadores.map(e => <option key={e} value={e}>{e}</option>)}
                   </select>
-                  <button style={styles.botaoAtribuir} onClick={() => handleAtribuirRota(c)}>🚚 Atribuir</button>
-                  <button style={styles.botaoEditar} onClick={() => { setClienteEditando(c); setFormAberto(true); }}>✏️</button>
-                  <button style={styles.botaoDeletar} onClick={() => { if (window.confirm('Excluir?')) excluirCliente(c.id); }}>🗑️</button>
+                  <button style={{ ...styles.botaoAtribuir, backgroundColor: cores.success, color: '#fff' }} onClick={() => handleAtribuirRota(c)}>🚚 Atribuir</button>
+                  <button style={{ ...styles.botaoEditar, backgroundColor: cores.cardBorder, color: cores.text }} onClick={() => { setClienteEditando(c); setFormAberto(true); }}>✏️</button>
+                  <button style={{ ...styles.botaoDeletar, backgroundColor: cores.cardBorder, color: cores.text }} onClick={() => { if (window.confirm('Excluir?')) excluirCliente(c.id); }}>🗑️</button>
                 </div>
               </div>
             );
@@ -132,14 +131,14 @@ export default function AdminHome({ onLogout }) {
           {rotasEmAndamento.map(r => {
             const loc = localizacoes.find(l => l.entregador === r.entregador);
             return (
-              <div key={r.id} style={{ ...styles.cardRota, backgroundColor: cores.card }}>
-                <p><strong>{r.clienteNome}</strong> - 👤 {r.entregador}</p>
-                <p>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
-                <p>🔑 {r.codigoEntrega} | 🕐 {new Date(r.iniciadoEm).toLocaleString()}</p>
+              <div key={r.id} style={{ ...styles.cardRota, backgroundColor: cores.card, borderColor: cores.primary }}>
+                <p style={{ color: cores.text }}><strong style={{ color: cores.primary }}>{r.clienteNome}</strong> - 👤 <span style={{ color: cores.text }}>{r.entregador}</span></p>
+                <p style={{ color: cores.textSecondary }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
+                <p style={{ color: cores.textSecondary }}>🔑 {r.codigoEntrega} | 🕐 {new Date(r.iniciadoEm).toLocaleString()}</p>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={styles.botaoGPS} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 Destino</button>
-                  {loc && <button style={styles.botaoEntregador} onClick={() => abrirLocalizacaoEntregador(loc.lat, loc.lng)}>👤 Ver {r.entregador}</button>}
-                  <button style={styles.botaoDeletar} onClick={() => excluirRota(r.id)}>🗑️</button>
+                  <button style={{ ...styles.botaoGPS, backgroundColor: cores.info, color: '#fff' }} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 Destino</button>
+                  {loc && <button style={{ ...styles.botaoEntregador, backgroundColor: cores.info, color: '#fff' }} onClick={() => abrirLocalizacaoEntregador(loc.lat, loc.lng)}>👤 Ver {r.entregador}</button>}
+                  <button style={{ ...styles.botaoDeletar, backgroundColor: cores.cardBorder, color: cores.text }} onClick={() => excluirRota(r.id)}>🗑️</button>
                 </div>
               </div>
             );
@@ -151,10 +150,10 @@ export default function AdminHome({ onLogout }) {
         <>
           <h3 style={{ color: cores.primary }}>📋 Concluídas ({rotasConcluidas.length})</h3>
           {rotasConcluidas.map(r => (
-            <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card }}>
-              <p><strong>{r.clienteNome}</strong> - 👤 {r.entregador}</p>
-              <p>🔑 {r.codigoEntrega}</p>
-              <p>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
+            <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card, borderColor: cores.success }}>
+              <p style={{ color: cores.text }}><strong style={{ color: cores.primary }}>{r.clienteNome}</strong> - 👤 <span style={{ color: cores.text }}>{r.entregador}</span></p>
+              <p style={{ color: cores.textSecondary }}>🔑 {r.codigoEntrega}</p>
+              <p style={{ color: cores.success }}>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
             </div>
           ))}
         </>
@@ -164,11 +163,11 @@ export default function AdminHome({ onLogout }) {
         <>
           <h3 style={{ color: cores.primary }}>📍 Entregadores</h3>
           {localizacoes.map(l => (
-            <div key={l.id} style={{ ...styles.cardEntregador, backgroundColor: cores.card }}>
-              <p><strong>{l.entregador}</strong></p>
-              <p>🚚 {rotasEmAndamento.filter(r => r.entregador === l.entregador).length} rota(s)</p>
-              <p>📡 {new Date(l.atualizadoEm).toLocaleTimeString()}</p>
-              <button style={styles.botaoEntregador} onClick={() => abrirLocalizacaoEntregador(l.lat, l.lng)}>📍 Mapa</button>
+            <div key={l.id} style={{ ...styles.cardEntregador, backgroundColor: cores.card, borderColor: cores.info }}>
+              <p style={{ color: cores.text }}><strong style={{ color: cores.primary }}>{l.entregador}</strong></p>
+              <p style={{ color: cores.textSecondary }}>🚚 {rotasEmAndamento.filter(r => r.entregador === l.entregador).length} rota(s)</p>
+              <p style={{ color: cores.textSecondary }}>📡 {new Date(l.atualizadoEm).toLocaleTimeString()}</p>
+              <button style={{ ...styles.botaoEntregador, backgroundColor: cores.info, color: '#fff' }} onClick={() => abrirLocalizacaoEntregador(l.lat, l.lng)}>📍 Mapa</button>
             </div>
           ))}
         </>
@@ -185,16 +184,16 @@ const styles = {
   botaoNovo: { border: 'none', borderRadius: 8, padding: '10px 16px', fontWeight: 'bold', cursor: 'pointer' },
   busca: { flex: 1, border: '1px solid', borderRadius: 10, padding: 10 },
   card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between', border: '1px solid' },
-  cardRota: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #e2b96f' },
-  cardConcluido: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #27ae60' },
-  cardEntregador: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #8e44ad' },
+  cardRota: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid' },
+  cardConcluido: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid' },
+  cardEntregador: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid' },
   nome: { fontWeight: 'bold', fontSize: 16, margin: '0 0 4px 0' },
-  info: { fontSize: 13, margin: '0 0 2px 0', color: '#aaa' },
+  info: { fontSize: 13, margin: '0 0 2px 0' },
   copiavel: { textDecoration: 'underline', cursor: 'pointer' },
-  select: { borderRadius: 8, padding: 8, fontSize: 13, background: '#2a2a4a', color: '#fff', border: 'none' },
-  botaoAtribuir: { backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 13, cursor: 'pointer' },
-  botaoEditar: { backgroundColor: '#2a2a4a', border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px', borderRadius: 8 },
-  botaoDeletar: { backgroundColor: '#2a2a4a', border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px', borderRadius: 8 },
-  botaoGPS: { flex: 1, backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer' },
-  botaoEntregador: { flex: 1, backgroundColor: '#8e44ad', color: '#fff', border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer' }
+  select: { borderRadius: 8, padding: 8, fontSize: 13, border: 'none', cursor: 'pointer' },
+  botaoAtribuir: { border: 'none', borderRadius: 8, padding: '8px', fontSize: 13, cursor: 'pointer', textAlign: 'center' },
+  botaoEditar: { border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px', borderRadius: 8, textAlign: 'center' },
+  botaoDeletar: { border: 'none', fontSize: 18, cursor: 'pointer', padding: '8px', borderRadius: 8, textAlign: 'center' },
+  botaoGPS: { flex: 1, border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer', textAlign: 'center' },
+  botaoEntregador: { flex: 1, border: 'none', borderRadius: 8, padding: '8px', fontSize: 12, cursor: 'pointer', textAlign: 'center' }
 };
