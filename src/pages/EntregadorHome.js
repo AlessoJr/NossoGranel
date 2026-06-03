@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getClientesRealtime, iniciarRota, concluirRota, getRotasRealtime, atualizarLocalizacao, marcarRotaComoVista } from '../services/firebaseService';
+import { getClientesRealtime, getRotasRealtime, criarRota, concluirRota, atualizarLocalizacao } from '../services/firebaseService';
 import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -12,6 +12,7 @@ function abrirGPS(endereco, apt) {
 export default function EntregadorHome({ usuario, onLogout }) {
   const { darkMode, toggleTheme } = useTheme();
   const cores = getTheme(darkMode);
+  const [clientes, setClientes] = useState([]);
   const [rotas, setRotas] = useState([]);
   const [busca, setBusca] = useState('');
   const [aba, setAba] = useState('rotas');
@@ -19,24 +20,22 @@ export default function EntregadorHome({ usuario, onLogout }) {
   const notificadasRef = useRef(new Set());
 
   useEffect(() => {
-    // Escutar rotas em tempo real
+    const unsubClientes = getClientesRealtime(setClientes);
     const unsubRotas = getRotasRealtime((novasRotas) => {
-      // Verificar novas rotas atribuídas para este entregador
+      // Notificar novas rotas atribuídas pelo ADM
       const minhasNovasRotas = novasRotas.filter(r => 
         r.entregador === usuario.nome && 
+        r.criadoPor === 'adm' && 
         r.status === 'em_andamento' && 
         !notificadasRef.current.has(r.id)
       );
-      
       minhasNovasRotas.forEach(r => {
         notificadasRef.current.add(r.id);
-        toast.info(`🔔 Nova rota atribuída: ${r.clienteNome} - Código: ${r.codigoEntrega}`);
+        toast.info(`🔔 ADM atribuiu: ${r.clienteNome} - Código: ${r.codigoEntrega}`);
       });
-      
       setRotas(novasRotas);
     });
 
-    // Iniciar rastreamento GPS
     if (navigator.geolocation) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (pos) => atualizarLocalizacao(usuario.nome, pos.coords.latitude, pos.coords.longitude),
@@ -46,58 +45,73 @@ export default function EntregadorHome({ usuario, onLogout }) {
     }
 
     return () => {
+      unsubClientes();
       unsubRotas();
       if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
   }, [usuario.nome]);
 
-  const minhasRotas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'em_andamento');
-  const minhasConcluidas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
-
-  const rotasFiltradas = minhasRotas.filter(r =>
-    r.clienteNome?.toLowerCase().includes(busca.toLowerCase()) ||
-    r.codigoEntrega?.includes(busca)
-  );
+  const handleAtivarRota = async (cliente) => {
+    const jaExiste = rotas.some(r => r.clienteId === cliente.id && r.status === 'em_andamento' && r.entregador === usuario.nome);
+    if (jaExiste) {
+      toast.warning('Você já tem uma rota ativa para este cliente!');
+      return;
+    }
+    await criarRota(cliente, usuario.nome, 'entregador');
+    toast.success(`Rota ativada para ${cliente.nome}!`);
+    setAba('rotas');
+  };
 
   const handleConcluirRota = async (rota) => {
     if (!window.confirm(`Concluir entrega de ${rota.clienteNome}?`)) return;
-    await concluirRota(rota.id, rota.codigoEntrega);
+    await concluirRota(rota.id);
     toast.success(`✅ Entrega de ${rota.clienteNome} concluída!`);
   };
 
-  const perfilEntregador = { nome: usuario.nome, tipo: 'entregador' };
+  const minhasRotas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'em_andamento');
+  const minhasConcluidas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
 
-  const handleNavigate = (pagina) => {
-    setAba(pagina);
-  };
+  const clientesFiltrados = clientes.filter(c =>
+    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+    c.codigoEntrega?.includes(busca)
+  );
+
+  const perfilEntregador = { nome: usuario.nome, tipo: 'entregador' };
+  const handleNavigate = (pagina) => setAba(pagina);
 
   return (
     <div style={{ ...styles.container, backgroundColor: cores.background }}>
       <div style={styles.header}>
-        <h1 style={{ ...styles.titulo, color: cores.primary }}>🚚 NossoGranel</h1>
-        <ProfileMenu 
-          usuario={perfilEntregador}
-          onLogout={onLogout}
-          toggleTheme={toggleTheme}
-          onNavigate={handleNavigate}
-        />
+        <h1 style={{ ...styles.titulo, color: cores.primary }}>🚚 {usuario.nome}</h1>
+        <ProfileMenu usuario={perfilEntregador} onLogout={onLogout} toggleTheme={toggleTheme} onNavigate={handleNavigate} />
       </div>
 
-      {/* Conteúdo da aba atual */}
+      {aba === 'clientes' && (
+        <>
+          <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar cliente..." value={busca} onChange={e => setBusca(e.target.value)} />
+          {clientesFiltrados.map(c => (
+            <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ ...styles.nome, color: cores.primary }}>{c.nome}</p>
+                <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+                <p style={styles.info}>📞 {c.telefone}</p>
+                <p style={styles.info}>🔑 {c.codigoEntrega}</p>
+              </div>
+              <button style={{ ...styles.botaoAtivar, backgroundColor: cores.primary, color: cores.background }} onClick={() => handleAtivarRota(c)}>🚚 Ativar</button>
+            </div>
+          ))}
+        </>
+      )}
+
       {aba === 'rotas' && (
         <>
-          <div style={styles.barraFerramentas}>
-            <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar cliente ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
-          </div>
-          <h3 style={{ color: cores.primary, marginBottom: 12 }}>🚚 Minhas Entregas ({minhasRotas.length})</h3>
-          {minhasRotas.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhuma rota atribuída ainda.</p>}
-          {rotasFiltradas.map(r => (
+          <h3 style={{ color: cores.primary }}>🚚 Em Andamento ({minhasRotas.length})</h3>
+          {minhasRotas.map(r => (
             <div key={r.id} style={{ ...styles.cardRota, backgroundColor: cores.card }}>
-              <p style={{ ...styles.nome, color: cores.primary }}>{r.clienteNome}</p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {r.clienteTelefone}</p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: <strong style={{ color: cores.primary, fontSize: 20 }}>{r.codigoEntrega}</strong></p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Atribuído: {new Date(r.iniciadoEm).toLocaleString()}</p>
+              <p><strong>{r.clienteNome}</strong> {r.criadoPor === 'adm' && <span style={{ fontSize: 11, color: '#e2b96f' }}>(ADM)</span>}</p>
+              <p>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
+              <p>📞 {r.clienteTelefone}</p>
+              <p>🔑 <strong style={{ fontSize: 20, color: cores.primary }}>{r.codigoEntrega}</strong></p>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button style={styles.botaoGPS} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 GPS</button>
                 <button style={styles.botaoConcluir} onClick={() => handleConcluirRota(r)}>✅ Concluir</button>
@@ -109,14 +123,12 @@ export default function EntregadorHome({ usuario, onLogout }) {
 
       {aba === 'concluidas' && (
         <>
-          <h3 style={{ color: cores.primary, marginBottom: 12 }}>✅ Entregas Concluídas ({minhasConcluidas.length})</h3>
-          {minhasConcluidas.length === 0 && <p style={{ ...styles.vazio, color: cores.textSecondary }}>Nenhuma entrega concluída.</p>}
+          <h3 style={{ color: cores.primary }}>✅ Concluídas ({minhasConcluidas.length})</h3>
           {minhasConcluidas.map(r => (
             <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card }}>
-              <p style={{ ...styles.nome, color: cores.primary }}>{r.clienteNome}</p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 Código: <strong style={{ color: '#27ae60' }}>{r.codigoEntrega}</strong></p>
-              <p style={{ ...styles.info, color: cores.textSecondary }}>🕐 Início: {new Date(r.iniciadoEm).toLocaleString()}</p>
-              <p style={{ ...styles.info, color: '#27ae60' }}>✅ Conclusão: {new Date(r.concluidoEm).toLocaleString()}</p>
+              <p><strong>{r.clienteNome}</strong></p>
+              <p>🔑 {r.codigoEntrega}</p>
+              <p>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
             </div>
           ))}
         </>
@@ -127,15 +139,15 @@ export default function EntregadorHome({ usuario, onLogout }) {
 
 const styles = {
   container: { minHeight: '100vh', padding: 16 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: 20, flexWrap: 'wrap', gap: 10 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
   titulo: { fontSize: 24, margin: 0 },
-  barraFerramentas: { marginBottom: 16 },
-  busca: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, boxSizing: 'border-box' },
+  busca: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, marginBottom: 12 },
+  card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #2a2a4a' },
   cardRota: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #e2b96f' },
   cardConcluido: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #27ae60' },
-  nome: { fontWeight: 'bold', fontSize: 16, margin: '0 0 4px 0' },
-  info: { fontSize: 13, margin: '0 0 2px 0' },
-  botaoGPS: { flex: 1, backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontWeight: 'bold', cursor: 'pointer' },
-  botaoConcluir: { flex: 1, backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontWeight: 'bold', cursor: 'pointer' },
-  vazio: { textAlign: 'center', marginTop: 40 }
+  nome: { fontWeight: 'bold', fontSize: 16, margin: 0 },
+  info: { fontSize: 13, margin: '2px 0', color: '#aaa' },
+  botaoAtivar: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
+  botaoGPS: { flex: 1, backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer' },
+  botaoConcluir: { flex: 1, backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer' }
 };

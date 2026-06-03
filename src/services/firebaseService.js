@@ -1,14 +1,5 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, getDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-
-// NOTIFICAÇÕES
-export const criarNotificacao = async (titulo, mensagem, tipo, destinatario) => {
-  await addDoc(collection(db, 'notificacoes'), {
-    titulo, mensagem, tipo, destinatario,
-    lida: false,
-    criadaEm: new Date().toISOString()
-  });
-};
 
 // CLIENTES
 export const getClientesRealtime = (callback) => {
@@ -39,7 +30,7 @@ export const getRotasRealtime = (callback) => {
   });
 };
 
-export const iniciarRota = async (cliente, entregador) => {
+export const criarRota = async (cliente, entregador, criadoPor) => {
   const rota = {
     clienteId: cliente.id,
     clienteNome: cliente.nome,
@@ -49,17 +40,17 @@ export const iniciarRota = async (cliente, entregador) => {
     codigoEntrega: cliente.codigoEntrega,
     entregador: entregador,
     status: 'em_andamento',
+    criadoPor: criadoPor, // 'adm' ou 'entregador'
     iniciadoEm: new Date().toISOString()
   };
   const docRef = await addDoc(collection(db, 'rotas'), rota);
   return { id: docRef.id, ...rota };
 };
 
-export const concluirRota = async (rotaId, codigoEntrega) => {
+export const concluirRota = async (rotaId) => {
   await updateDoc(doc(db, 'rotas', rotaId), {
     status: 'concluida',
-    concluidoEm: new Date().toISOString(),
-    codigoConfirmacao: codigoEntrega
+    concluidoEm: new Date().toISOString()
   });
 };
 
@@ -69,11 +60,8 @@ export const excluirRota = async (rotaId) => {
 
 // LOCALIZAÇÕES
 export const atualizarLocalizacao = async (entregador, lat, lng) => {
-  const localizacaoRef = doc(db, 'localizacoes', entregador);
-  await setDoc(localizacaoRef, {
-    entregador,
-    lat,
-    lng,
+  await setDoc(doc(db, 'localizacoes', entregador), {
+    entregador, lat, lng,
     atualizadoEm: new Date().toISOString()
   });
 };
@@ -84,28 +72,16 @@ export const getLocalizacoesRealtime = (callback) => {
   });
 };
 
-// ENTREGADORES
+// ENTREGADORES (lista fixa - pode expandir)
 export const getEntregadores = (callback) => {
-  // Busca entregadores únicos das rotas e da lista fixa
-  const unsub = onSnapshot(collection(db, 'rotas'), (snap) => {
-    const entregadoresSet = new Set();
-    snap.docs.forEach(d => {
-      const data = d.data();
-      if (data.entregador) entregadoresSet.add(data.entregador);
-    });
-    callback(Array.from(entregadoresSet));
-  });
-  return unsub;
+  callback(['Entregador']);
 };
 
 // CONFIGURAÇÕES
 export const getConfiguracoes = async () => {
   const docRef = doc(db, 'configuracoes', 'geral');
   const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) {
-    return docSnap.data();
-  }
-  return { assinaturaOpcional: false };
+  return docSnap.exists() ? docSnap.data() : { assinaturaOpcional: false };
 };
 
 export const salvarConfiguracoes = async (config) => {
