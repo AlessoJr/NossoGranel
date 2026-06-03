@@ -7,9 +7,7 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     const saved = localStorage.getItem('darkMode');
-    if (saved !== null) {
-      setDarkMode(saved === 'true');
-    }
+    if (saved !== null) setDarkMode(saved === 'true');
   }, []);
 
   const toggleTheme = () => {
@@ -34,7 +32,7 @@ export const getTheme = (darkMode) => ({
   card: darkMode ? '#16213e' : '#ffffff',
   cardBorder: darkMode ? '#2a2a4a' : '#dddddd',
   text: darkMode ? '#ffffff' : '#333333',
-  textSecondary: darkMode ? '#aaaaaa' : '#666666',
+  textSecondary: darkMode ? '#cccccc' : '#666666',
   primary: '#e2b96f',
   success: '#27ae60',
   danger: '#c0392b',

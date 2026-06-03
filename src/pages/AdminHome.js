@@ -38,15 +38,16 @@ export default function AdminHome({ onLogout }) {
     getEntregadores(setEntregadores);
     const unsub1 = getClientesRealtime(setClientes);
     const unsub2 = getRotasRealtime((novasRotas) => {
-      // Notificar novas rotas criadas por entregador
-      novasRotas.filter(r => r.criadoPor === 'entregador' && r.status === 'em_andamento' && !notificadasRef.current.has(r.id)).forEach(r => {
-        notificadasRef.current.add(r.id);
-        toast.info(`🔔 ${r.entregador} ativou rota para ${r.clienteNome} - Código: ${r.codigoEntrega}`);
-      });
-      // Notificar rotas concluídas
-      novasRotas.filter(r => r.status === 'concluida' && !notificadasRef.current.has(`concluida_${r.id}`)).forEach(r => {
-        notificadasRef.current.add(`concluida_${r.id}`);
-        toast.success(`✅ ${r.clienteNome} entregue por ${r.entregador} — Código: ${r.codigoEntrega}`);
+      // Notificar apenas rotas novas (não repetir)
+      novasRotas.forEach(r => {
+        if (r.status === 'em_andamento' && r.criadoPor === 'entregador' && !notificadasRef.current.has(r.id)) {
+          notificadasRef.current.add(r.id);
+          toast.info(`🔔 ${r.entregador} ativou rota para ${r.clienteNome}`);
+        }
+        if (r.status === 'concluida' && !notificadasRef.current.has(`concluida_${r.id}`)) {
+          notificadasRef.current.add(`concluida_${r.id}`);
+          toast.success(`✅ ${r.clienteNome} entregue por ${r.entregador}`);
+        }
       });
       setRotas(novasRotas);
     });
@@ -62,21 +63,14 @@ export default function AdminHome({ onLogout }) {
   };
 
   const handleAtribuirRota = async (cliente) => {
-    if (!entregadorSelecionado) {
-      toast.warning('Selecione um entregador!');
-      return;
-    }
+    if (!entregadorSelecionado) { toast.warning('Selecione um entregador!'); return; }
     await criarRota(cliente, entregadorSelecionado, 'adm');
-    toast.success(`Rota de ${cliente.nome} atribuída para ${entregadorSelecionado}!`);
+    toast.success(`Rota de ${cliente.nome} atribuída!`);
     setEntregadorSelecionado('');
   };
 
   const rotasEmAndamento = rotas.filter(r => r.status === 'em_andamento');
   const rotasConcluidas = rotas.filter(r => r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
-
-  const trintaDiasAtras = new Date();
-  trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-  const clientesInativos = clientes.filter(c => c.ultimoPedido && new Date(c.ultimoPedido) < trintaDiasAtras);
 
   const clientesFiltrados = clientes.filter(c =>
     c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
@@ -100,12 +94,6 @@ export default function AdminHome({ onLogout }) {
         <ProfileMenu usuario={perfilAdmin} onLogout={onLogout} toggleTheme={toggleTheme} onNavigate={handleNavigate} />
       </div>
 
-      {clientesInativos.length > 0 && (
-        <div style={{ ...styles.aviso, borderColor: cores.warning }}>
-          <p style={{ color: cores.warning }}>⚠️ {clientesInativos.length} cliente(s) inativo(s)</p>
-        </div>
-      )}
-
       {aba === 'clientes' && (
         <>
           <div style={styles.barraFerramentas}>
@@ -113,14 +101,15 @@ export default function AdminHome({ onLogout }) {
             <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar..." value={busca} onChange={e => setBusca(e.target.value)} />
           </div>
           {clientesFiltrados.map(c => {
-            const emRota = rotasEmAndamento.some(r => r.clienteId === c.id);
+            const rotaAtiva = rotasEmAndamento.find(r => r.clienteId === c.id);
+            const isEmRota = !!rotaAtiva;
             return (
-              <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: emRota ? '#27ae60' : cores.cardBorder }}>
+              <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: isEmRota ? cores.success : cores.cardBorder, borderWidth: isEmRota ? 2 : 1 }}>
                 <div style={{ flex: 1 }}>
-                  <p style={{ ...styles.nome, color: cores.primary }}>{c.nome} {emRota && <span style={{ fontSize: 11, color: '#27ae60' }}>🚚 Em rota</span>}</p>
+                  <p style={{ ...styles.nome, color: cores.primary }}>{c.nome} {isEmRota && <span style={{ fontSize: 11, color: cores.success }}>🚚 {rotaAtiva.entregador}</span>}</p>
                   <p style={styles.info}>📞 <span style={styles.copiavel} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone}</span></p>
                   <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-                  <p style={styles.info}>🔑 <span style={styles.copiavel} onClick={() => copiar(c.codigoEntrega, 'Código')}>{c.codigoEntrega}</span> | 🛒 {c.qtdPedidos}</p>
+                  <p style={styles.info}>🔑 {c.codigoEntrega} | 🛒 {c.qtdPedidos}</p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <select style={styles.select} value={entregadorSelecionado} onChange={(e) => setEntregadorSelecionado(e.target.value)}>
@@ -192,7 +181,6 @@ const styles = {
   container: { minHeight: '100vh', padding: 16 },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
   titulo: { fontSize: 24, margin: 0 },
-  aviso: { border: '1px solid', borderRadius: 8, padding: 8, marginBottom: 16, textAlign: 'center' },
   barraFerramentas: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
   botaoNovo: { border: 'none', borderRadius: 8, padding: '10px 16px', fontWeight: 'bold', cursor: 'pointer' },
   busca: { flex: 1, border: '1px solid', borderRadius: 10, padding: 10 },

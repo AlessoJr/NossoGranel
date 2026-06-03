@@ -22,16 +22,12 @@ export default function EntregadorHome({ usuario, onLogout }) {
   useEffect(() => {
     const unsubClientes = getClientesRealtime(setClientes);
     const unsubRotas = getRotasRealtime((novasRotas) => {
-      // Notificar novas rotas atribuídas pelo ADM
-      const minhasNovasRotas = novasRotas.filter(r => 
-        r.entregador === usuario.nome && 
-        r.criadoPor === 'adm' && 
-        r.status === 'em_andamento' && 
-        !notificadasRef.current.has(r.id)
-      );
-      minhasNovasRotas.forEach(r => {
-        notificadasRef.current.add(r.id);
-        toast.info(`🔔 ADM atribuiu: ${r.clienteNome} - Código: ${r.codigoEntrega}`);
+      // Notificar apenas rotas novas atribuídas pelo ADM (uma vez)
+      novasRotas.forEach(r => {
+        if (r.entregador === usuario.nome && r.criadoPor === 'adm' && r.status === 'em_andamento' && !notificadasRef.current.has(r.id)) {
+          notificadasRef.current.add(r.id);
+          toast.info(`🔔 ADM atribuiu: ${r.clienteNome}`);
+        }
       });
       setRotas(novasRotas);
     });
@@ -89,17 +85,23 @@ export default function EntregadorHome({ usuario, onLogout }) {
       {aba === 'clientes' && (
         <>
           <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar cliente..." value={busca} onChange={e => setBusca(e.target.value)} />
-          {clientesFiltrados.map(c => (
-            <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card }}>
-              <div style={{ flex: 1 }}>
-                <p style={{ ...styles.nome, color: cores.primary }}>{c.nome}</p>
-                <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-                <p style={styles.info}>📞 {c.telefone}</p>
-                <p style={styles.info}>🔑 {c.codigoEntrega}</p>
+          {clientesFiltrados.map(c => {
+            const rotaAtiva = minhasRotas.some(r => r.clienteId === c.id);
+            return (
+              <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: rotaAtiva ? cores.success : cores.cardBorder, borderWidth: rotaAtiva ? 2 : 1 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ ...styles.nome, color: cores.primary }}>{c.nome}</p>
+                  <p style={styles.info}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+                  <p style={styles.info}>📞 {c.telefone}</p>
+                  <p style={styles.info}>🔑 {c.codigoEntrega}</p>
+                </div>
+                {!rotaAtiva && (
+                  <button style={{ ...styles.botaoAtivar, backgroundColor: cores.primary, color: cores.background }} onClick={() => handleAtivarRota(c)}>🚚 Ativar</button>
+                )}
+                {rotaAtiva && <span style={{ fontSize: 12, color: cores.success }}>✅ Em rota</span>}
               </div>
-              <button style={{ ...styles.botaoAtivar, backgroundColor: cores.primary, color: cores.background }} onClick={() => handleAtivarRota(c)}>🚚 Ativar</button>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
 
@@ -108,7 +110,7 @@ export default function EntregadorHome({ usuario, onLogout }) {
           <h3 style={{ color: cores.primary }}>🚚 Em Andamento ({minhasRotas.length})</h3>
           {minhasRotas.map(r => (
             <div key={r.id} style={{ ...styles.cardRota, backgroundColor: cores.card }}>
-              <p><strong>{r.clienteNome}</strong> {r.criadoPor === 'adm' && <span style={{ fontSize: 11, color: '#e2b96f' }}>(ADM)</span>}</p>
+              <p><strong>{r.clienteNome}</strong> {r.criadoPor === 'adm' && <span style={{ fontSize: 11, color: cores.primary }}>(ADM)</span>}</p>
               <p>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
               <p>📞 {r.clienteTelefone}</p>
               <p>🔑 <strong style={{ fontSize: 20, color: cores.primary }}>{r.codigoEntrega}</strong></p>
@@ -142,7 +144,7 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 },
   titulo: { fontSize: 24, margin: 0 },
   busca: { width: '100%', border: '1px solid', borderRadius: 10, padding: 12, marginBottom: 12 },
-  card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #2a2a4a' },
+  card: { borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid' },
   cardRota: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #e2b96f' },
   cardConcluido: { borderRadius: 12, padding: 14, marginBottom: 10, border: '2px solid #27ae60' },
   nome: { fontWeight: 'bold', fontSize: 16, margin: 0 },
