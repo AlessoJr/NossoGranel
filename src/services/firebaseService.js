@@ -10,10 +10,12 @@ export const getClientesRealtime = (callback) => {
 
 export const salvarCliente = async (cliente) => {
   if (cliente.id) {
+    // Atualizar cliente existente
     const { id, ...dados } = cliente;
     await updateDoc(doc(db, 'clientes', id), dados);
     return { id, ...dados };
   } else {
+    // Criar novo cliente
     const docRef = await addDoc(collection(db, 'clientes'), cliente);
     return { id: docRef.id, ...cliente };
   }
@@ -40,7 +42,7 @@ export const criarRota = async (cliente, entregador, criadoPor) => {
     codigoEntrega: cliente.codigoEntrega,
     entregador: entregador,
     status: 'em_andamento',
-    criadoPor: criadoPor, // 'adm' ou 'entregador'
+    criadoPor: criadoPor,
     iniciadoEm: new Date().toISOString()
   };
   const docRef = await addDoc(collection(db, 'rotas'), rota);
@@ -72,7 +74,7 @@ export const getLocalizacoesRealtime = (callback) => {
   });
 };
 
-// ENTREGADORES (lista fixa - pode expandir)
+// ENTREGADORES
 export const getEntregadores = (callback) => {
   callback(['Entregador']);
 };

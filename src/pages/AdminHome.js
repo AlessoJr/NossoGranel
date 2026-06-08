@@ -93,21 +93,22 @@ export default function AdminHome({ onLogout }) {
     if (!window.confirm(`Tem certeza que deseja excluir ${clienteNome}?`)) return;
     
     try {
-      // Buscar todas as rotas deste cliente
+      // Encontrar todas as rotas deste cliente
       const rotasDoCliente = rotas.filter(r => r.clienteId === clienteId);
       
-      // Excluir cada rota associada
+      // Excluir cada rota
       for (const rota of rotasDoCliente) {
         await excluirRota(rota.id);
       }
       
-      // Depois excluir o cliente
+      // Excluir o cliente
       await excluirCliente(clienteId);
       
       toast.success(`${clienteNome} excluído com sucesso!`);
     } catch (error) {
-      console.error('Erro ao excluir:', error);
-      toast.error('Erro ao excluir cliente');
+      console.error(error);
+      // Mostra o erro detalhado no toast
+      toast.error(`Erro: ${error.message || error}`);
     }
   };
 
@@ -122,9 +123,9 @@ export default function AdminHome({ onLogout }) {
   const rotasConcluidas = rotas.filter(r => r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
 
   const clientesFiltrados = clientes.filter(c =>
-    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    c.telefone?.includes(busca) ||
-    c.codigoEntrega?.includes(busca)
+    (c.nome ?? '').toLowerCase().includes(busca.toLowerCase()) ||
+    (c.telefone ?? '').includes(busca) ||
+    (c.codigoEntrega ?? '').includes(busca)
   );
 
   const perfilAdmin = { nome: 'Administrador', tipo: 'admin' };

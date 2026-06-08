@@ -45,9 +45,9 @@ export default function Clientes({ onLogout }) {
   }
 
   const filtrados = clientes.filter(c =>
-    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    c.telefone?.includes(busca) ||
-    c.codigoEntrega?.includes(busca)
+    (c.nome ?? '').toLowerCase().includes(busca.toLowerCase()) ||
+    (c.telefone ?? '').includes(busca) ||
+    (c.codigoEntrega ?? '').includes(busca)
   );
 
   const rotasEmAndamento = rotas.filter(r => r.status === 'em_rota');

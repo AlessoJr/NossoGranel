@@ -80,8 +80,8 @@ export default function EntregadorHome({ usuario, onLogout }) {
   const minhasConcluidas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
 
   const clientesFiltrados = clientes.filter(c =>
-    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    c.codigoEntrega?.includes(busca)
+    (c.nome ?? '').toLowerCase().includes(busca.toLowerCase()) ||
+    (c.codigoEntrega ?? "").includes(busca)
   );
 
   const perfilEntregador = { nome: usuario.nome, tipo: 'entregador' };
