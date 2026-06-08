@@ -78,10 +78,37 @@ export default function AdminHome({ onLogout }) {
   }, []);
 
   const handleSalvarCliente = async (cliente) => {
-    await salvarCliente(cliente);
-    setFormAberto(false);
-    setClienteEditando(null);
-    toast.success('Cliente salvo!');
+    try {
+      await salvarCliente(cliente);
+      setFormAberto(false);
+      setClienteEditando(null);
+      toast.success('Cliente salvo com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      toast.error('Erro ao salvar cliente');
+    }
+  };
+
+  const handleExcluirCliente = async (clienteId, clienteNome) => {
+    if (!window.confirm(`Tem certeza que deseja excluir ${clienteNome}?`)) return;
+    
+    try {
+      // Buscar todas as rotas deste cliente
+      const rotasDoCliente = rotas.filter(r => r.clienteId === clienteId);
+      
+      // Excluir cada rota associada
+      for (const rota of rotasDoCliente) {
+        await excluirRota(rota.id);
+      }
+      
+      // Depois excluir o cliente
+      await excluirCliente(clienteId);
+      
+      toast.success(`${clienteNome} excluído com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      toast.error('Erro ao excluir cliente');
+    }
   };
 
   const handleAtribuirRota = async (cliente) => {
@@ -123,7 +150,6 @@ export default function AdminHome({ onLogout }) {
             <input style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} placeholder="Buscar..." value={busca} onChange={e => setBusca(e.target.value)} />
           </div>
           {clientesFiltrados.map(c => {
-            // Verifica se existe uma rota EM ANDAMENTO para este cliente
             const rotaAtiva = rotasEmAndamento.find(r => r.clienteId === c.id);
             const isEmRota = !!rotaAtiva;
             return (
@@ -144,7 +170,7 @@ export default function AdminHome({ onLogout }) {
                   </select>
                   <button style={{ ...styles.botaoAtribuir, backgroundColor: cores.success, color: '#fff' }} onClick={() => handleAtribuirRota(c)}>🚚 Atribuir</button>
                   <button style={{ ...styles.botaoEditar, backgroundColor: cores.cardBorder, color: cores.text }} onClick={() => { setClienteEditando(c); setFormAberto(true); }}>✏️</button>
-                  <button style={{ ...styles.botaoDeletar, backgroundColor: cores.cardBorder, color: cores.text }} onClick={() => { if (window.confirm('Excluir?')) excluirCliente(c.id); }}>🗑️</button>
+                  <button style={{ ...styles.botaoDeletar, backgroundColor: cores.danger, color: '#fff' }} onClick={() => handleExcluirCliente(c.id, c.nome)}>🗑️</button>
                 </div>
               </div>
             );
