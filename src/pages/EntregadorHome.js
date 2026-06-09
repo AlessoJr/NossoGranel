@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import Chat from './Chat';
 import { getClientesRealtime, getRotasRealtime, criarRota, concluirRota, atualizarLocalizacao } from '../services/firebaseService';
 import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
@@ -7,6 +8,56 @@ import { toast } from 'react-toastify';
 function abrirGPS(endereco, apt) {
   const end = `${endereco}${apt ? ` ${apt}` : ''}`;
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(end)}`, '_blank');
+}
+
+function abrirRotaOtimizada(rotas) {
+  if (rotas.length === 0) return;
+  const enderecos = rotas.map(r => `${r.clienteEndereco}${r.clienteApt ? ` ${r.clienteApt}` : ''}`);
+  const destino = encodeURIComponent(enderecos[enderecos.length - 1]);
+  const waypoints = enderecos.slice(0, -1).map(e => encodeURIComponent(e)).join('|');
+  const url = waypoints
+    ? `https://www.google.com/maps/dir/?api=1&destination=${destino}&waypoints=${waypoints}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${destino}&travelmode=driving`;
+  window.open(url, '_blank');
+}
+
+// Distância entre dois pontos (Haversine)
+function distancia(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Algoritmo do vizinho mais próximo
+function otimizarRota(rotas, latAtual, lngAtual) {
+  if (rotas.length <= 1) return rotas;
+  const rotasComCoord = rotas.filter(r => r.lat && r.lng);
+  const rotasSemCoord = rotas.filter(r => !r.lat || !r.lng);
+  if (rotasComCoord.length <= 1) return rotas;
+
+  const resultado = [];
+  let restantes = [...rotasComCoord];
+  let latAtl = latAtual;
+  let lngAtl = lngAtual;
+
+  while (restantes.length > 0) {
+    let maisProximo = restantes[0];
+    let menorDist = distancia(latAtl, lngAtl, maisProximo.lat, maisProximo.lng);
+    for (const r of restantes) {
+      const d = distancia(latAtl, lngAtl, r.lat, r.lng);
+      if (d < menorDist) { menorDist = d; maisProximo = r; }
+    }
+    resultado.push(maisProximo);
+    latAtl = maisProximo.lat;
+    lngAtl = maisProximo.lng;
+    restantes = restantes.filter(r => r.id !== maisProximo.id);
+  }
+
+  return [...resultado, ...rotasSemCoord];
 }
 
 const NOTIFICACOES_VISTAS_KEY = 'entregador_notificacoes_vistas';
@@ -18,13 +69,17 @@ export default function EntregadorHome({ usuario, onLogout }) {
   const [rotas, setRotas] = useState([]);
   const [busca, setBusca] = useState('');
   const [aba, setAba] = useState('rotas');
+  const [posAtual, setPosAtual] = useState(null);
+  const [rotasOtimizadas, setRotasOtimizadas] = useState(null);
+  const [otimizando, setOtimizando] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const watchIdRef = useRef(null);
 
   const getNotificacoesVistas = () => {
     const saved = sessionStorage.getItem(NOTIFICACOES_VISTAS_KEY);
     return saved ? new Set(JSON.parse(saved)) : new Set();
   };
-  
+
   const salvarNotificacoesVistas = (set) => {
     sessionStorage.setItem(NOTIFICACOES_VISTAS_KEY, JSON.stringify([...set]));
   };
@@ -34,7 +89,6 @@ export default function EntregadorHome({ usuario, onLogout }) {
     const unsubRotas = getRotasRealtime((novasRotas) => {
       const notificadas = getNotificacoesVistas();
       let atualizado = false;
-      
       novasRotas.forEach(r => {
         const idAtribuida = `adm_${r.id}`;
         if (r.entregador === usuario.nome && r.criadoPor === 'adm' && r.status === 'em_andamento' && !notificadas.has(idAtribuida)) {
@@ -43,14 +97,17 @@ export default function EntregadorHome({ usuario, onLogout }) {
           toast.info(`🔔 ADM atribuiu: ${r.clienteNome}`);
         }
       });
-      
       if (atualizado) salvarNotificacoesVistas(notificadas);
       setRotas(novasRotas);
+      setRotasOtimizadas(null);
     });
 
     if (navigator.geolocation) {
       watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => atualizarLocalizacao(usuario.nome, pos.coords.latitude, pos.coords.longitude),
+        (pos) => {
+          setPosAtual({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          atualizarLocalizacao(usuario.nome, pos.coords.latitude, pos.coords.longitude);
+        },
         (err) => console.log('GPS erro:', err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
       );
@@ -64,7 +121,6 @@ export default function EntregadorHome({ usuario, onLogout }) {
   }, [usuario.nome]);
 
   const handleAtivarRota = async (cliente) => {
-    // REMOVIDO: não bloqueia mais se já tem rota ativa
     await criarRota(cliente, usuario.nome, 'entregador');
     toast.success(`Rota ativada para ${cliente.nome}!`);
     setAba('rotas');
@@ -76,16 +132,48 @@ export default function EntregadorHome({ usuario, onLogout }) {
     toast.success(`✅ Entrega de ${rota.clienteNome} concluída!`);
   };
 
+  const handleOtimizarRota = async () => {
+    if (minhasRotas.length < 2) { toast.warning('Precisa de pelo menos 2 rotas para otimizar!'); return; }
+    setOtimizando(true);
+    toast.info('Calculando melhor rota...');
+
+    try {
+      // Geocodifica endereços sem coordenadas
+      const rotasComCoord = await Promise.all(minhasRotas.map(async (r) => {
+        if (r.lat && r.lng) return r;
+        try {
+          const end = `${r.clienteEndereco}${r.clienteApt ? ` ${r.clienteApt}` : ''}`;
+          const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(end)}&limit=1`);
+          const data = await resp.json();
+          if (data.length > 0) return { ...r, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        } catch {}
+        return r;
+      }));
+
+      const lat = posAtual?.lat || -8.0476;
+      const lng = posAtual?.lng || -34.8770;
+      const otimizadas = otimizarRota(rotasComCoord, lat, lng);
+      setRotasOtimizadas(otimizadas);
+      toast.success('Rota otimizada! 🗺️');
+    } catch (e) {
+      toast.error('Erro ao otimizar rota');
+    } finally {
+      setOtimizando(false);
+    }
+  };
+
   const minhasRotas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'em_andamento');
   const minhasConcluidas = rotas.filter(r => r.entregador === usuario.nome && r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
+  const rotasExibidas = rotasOtimizadas || minhasRotas;
 
   const clientesFiltrados = clientes.filter(c =>
     (c.nome ?? '').toLowerCase().includes(busca.toLowerCase()) ||
-    (c.codigoEntrega ?? "").includes(busca)
+    (c.codigoEntrega ?? '').includes(busca)
   );
 
   const perfilEntregador = { nome: usuario.nome, tipo: 'entregador' };
-  const handleNavigate = (pagina) => setAba(pagina);
+  if (showChat) return <Chat usuario={usuario} onVoltar={() => setShowChat(false)} />;
+  const handleNavigate = (pagina) => { if (pagina === 'chat') setShowChat(true); else setAba(pagina); };
 
   return (
     <div style={{ ...styles.container, backgroundColor: cores.background }}>
@@ -103,9 +191,9 @@ export default function EntregadorHome({ usuario, onLogout }) {
               <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: rotaAtiva ? cores.success : cores.cardBorder, borderWidth: rotaAtiva ? 2 : 1 }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ ...styles.nome, color: cores.primary }}>{c.nome}</p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>📞 {c.telefone}</p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 {c.codigoEntrega}</p>
+                  <p style={{ ...styles.info, color: cores.text }}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+                  <p style={{ ...styles.info, color: cores.text }}>📞 {c.telefone}</p>
+                  <p style={{ ...styles.info, color: cores.text }}>🔑 {c.codigoEntrega}</p>
                 </div>
                 <button style={{ ...styles.botaoAtivar, backgroundColor: cores.primary, color: cores.background }} onClick={() => handleAtivarRota(c)}>🚚 Ativar</button>
               </div>
@@ -116,13 +204,43 @@ export default function EntregadorHome({ usuario, onLogout }) {
 
       {aba === 'rotas' && (
         <>
-          <h3 style={{ color: cores.primary }}>🚚 Em Andamento ({minhasRotas.length})</h3>
-          {minhasRotas.map(r => (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ color: cores.primary, margin: 0 }}>🚚 Em Andamento ({minhasRotas.length})</h3>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {rotasOtimizadas && (
+                <button style={{ ...styles.botaoGPS, backgroundColor: cores.info, color: '#fff', fontSize: 12 }}
+                  onClick={() => abrirRotaOtimizada(rotasExibidas)}>
+                  🗺️ Abrir GPS
+                </button>
+              )}
+              {minhasRotas.length >= 2 && (
+                <button style={{ ...styles.botaoOtimizar, backgroundColor: otimizando ? '#888' : cores.warning, color: '#fff' }}
+                  onClick={handleOtimizarRota} disabled={otimizando}>
+                  {otimizando ? '⏳' : '✨ Otimizar'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {rotasOtimizadas && (
+            <div style={{ backgroundColor: cores.card, borderRadius: 8, padding: '8px 12px', marginBottom: 12, border: `1px solid ${cores.success}` }}>
+              <p style={{ color: cores.success, fontSize: 12, margin: 0 }}>✅ Rota otimizada — ordem pelo caminho mais curto</p>
+            </div>
+          )}
+
+          {minhasRotas.length === 0 && <p style={{ color: cores.textSecondary, textAlign: 'center' }}>Nenhuma rota em andamento.</p>}
+          {rotasExibidas.map((r, i) => (
             <div key={r.id} style={{ ...styles.cardRota, backgroundColor: cores.card, borderColor: cores.primary }}>
-              <p style={{ color: cores.text }}><strong style={{ color: cores.primary }}>{r.clienteNome}</strong> {r.criadoPor === 'adm' && <span style={{ fontSize: 11, color: cores.primary }}>(ADM)</span>}</p>
-              <p style={{ color: cores.textSecondary }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
-              <p style={{ color: cores.textSecondary }}>📞 {r.clienteTelefone}</p>
-              <p style={{ color: cores.textSecondary }}>🔑 <strong style={{ fontSize: 20, color: cores.primary }}>{r.codigoEntrega}</strong></p>
+              {rotasOtimizadas && (
+                <p style={{ color: cores.warning, fontSize: 11, margin: '0 0 6px', fontWeight: 'bold' }}>📍 Parada {i + 1}</p>
+              )}
+              <p style={{ ...styles.info, color: cores.text }}>
+                <strong style={{ color: cores.primary }}>{r.clienteNome}</strong>
+                {r.criadoPor === 'adm' && <span style={{ fontSize: 11, color: cores.primary }}> (ADM)</span>}
+              </p>
+              <p style={{ ...styles.info, color: cores.text }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
+              <p style={{ ...styles.info, color: cores.text }}>📞 {r.clienteTelefone}</p>
+              <p style={{ ...styles.info, color: cores.text }}>🔑 <strong style={{ fontSize: 20, color: cores.primary }}>{r.codigoEntrega}</strong></p>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button style={{ ...styles.botaoGPS, backgroundColor: cores.info, color: '#fff' }} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 GPS</button>
                 <button style={{ ...styles.botaoConcluir, backgroundColor: cores.success, color: '#fff' }} onClick={() => handleConcluirRota(r)}>✅ Concluir</button>
@@ -137,9 +255,9 @@ export default function EntregadorHome({ usuario, onLogout }) {
           <h3 style={{ color: cores.primary }}>✅ Concluídas ({minhasConcluidas.length})</h3>
           {minhasConcluidas.map(r => (
             <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card, borderColor: cores.success }}>
-              <p style={{ color: cores.text }}><strong style={{ color: cores.primary }}>{r.clienteNome}</strong></p>
-              <p style={{ color: cores.textSecondary }}>🔑 {r.codigoEntrega}</p>
-              <p style={{ color: cores.success }}>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
+              <p style={{ ...styles.info, color: cores.primary, fontWeight: 'bold' }}>{r.clienteNome}</p>
+              <p style={{ ...styles.info, color: cores.text }}>🔑 {r.codigoEntrega}</p>
+              <p style={{ ...styles.info, color: cores.success }}>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
             </div>
           ))}
         </>
@@ -159,6 +277,7 @@ const styles = {
   nome: { fontWeight: 'bold', fontSize: 16, margin: 0 },
   info: { fontSize: 13, margin: '2px 0' },
   botaoAtivar: { border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' },
+  botaoOtimizar: { border: 'none', borderRadius: 8, padding: '8px 12px', fontWeight: 'bold', cursor: 'pointer', fontSize: 13 },
   botaoGPS: { flex: 1, border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', textAlign: 'center' },
   botaoConcluir: { flex: 1, border: 'none', borderRadius: 8, padding: '10px', cursor: 'pointer', textAlign: 'center' }
 };

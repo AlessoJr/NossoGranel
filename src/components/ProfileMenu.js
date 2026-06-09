@@ -12,6 +12,7 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
     { id: 'historico', label: 'Histórico', icone: '📋' },
     { id: 'entregadores', label: 'Entregadores', icone: '📍' },
     { id: 'entregadores_cadastro', label: 'Cadastrar Entregador', icone: '➕' },
+    { id: 'chat', label: 'Chat', icone: '💬' },
     { id: 'estatisticas', label: 'Estatísticas', icone: '📊' },
     { id: 'configuracoes', label: 'Configurações', icone: '⚙️' },
     { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
@@ -20,6 +21,7 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
   const opcoesEntregador = [
     { id: 'clientes', label: 'Clientes', icone: '👥' },
     { id: 'rotas', label: 'Minhas Entregas', icone: '🚚' },
+    { id: 'chat', label: 'Chat', icone: '💬' },
     { id: 'concluidas', label: 'Concluídas', icone: '✅' },
     { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
   ];
