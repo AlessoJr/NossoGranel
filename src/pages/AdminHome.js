@@ -180,6 +180,7 @@ export default function AdminHome({ onLogout }) {
               <p style={{ ...styles.info, color: cores.primary, fontWeight: 'bold' }}>{r.clienteNome} <span style={{ color: cores.text, fontWeight: 'normal' }}>- 👤 {r.entregador}</span></p>
               <p style={{ ...styles.info, color: cores.text }}>🔑 {r.codigoEntrega}</p>
               <p style={{ ...styles.info, color: cores.success }}>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}><button style={{ ...styles.botaoDeletar }} onClick={() => { if(window.confirm(`Excluir entrega de ${r.clienteNome}?`)) excluirRota(r.id); }}>🗑️ Excluir</button></div>
             </div>
           ))}
         </>
