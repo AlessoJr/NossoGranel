@@ -90,3 +90,21 @@ export const getConfiguracoes = async () => {
 export const salvarConfiguracoes = async (config) => {
   await setDoc(doc(db, 'configuracoes', 'geral'), config);
 };
+
+// AUTENTICAÇÃO
+import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
+
+export const loginComEmail = async (email, senha) => {
+  const result = await signInWithEmailAndPassword(auth, email, senha);
+  return result.user;
+};
+
+export const logoutFirebase = async () => {
+  await signOut(auth);
+};
+
+export const criarUsuario = async (email, senha) => {
+  const result = await createUserWithEmailAndPassword(auth, email, senha);
+  return result.user;
+};

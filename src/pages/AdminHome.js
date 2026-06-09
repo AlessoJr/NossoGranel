@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { getClientesRealtime, getRotasRealtime, salvarCliente, excluirCliente, excluirRota, criarRota, getLocalizacoesRealtime, getEntregadores } from '../services/firebaseService';
 import FormCliente from '../components/FormCliente';
 import AdminConfiguracoes from './AdminConfiguracoes';
+import CadastroEntregador from './CadastroEntregador';
+import Estatisticas from './Estatisticas';
 import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -38,6 +40,8 @@ export default function AdminHome({ onLogout }) {
   const [formAberto, setFormAberto] = useState(false);
   const [clienteEditando, setClienteEditando] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
+  const [showEntregadores, setShowEntregadores] = useState(false);
+  const [showEstatisticas, setShowEstatisticas] = useState(false);
   const [entregadorSelecionado, setEntregadorSelecionado] = useState('');
 
   useEffect(() => {
@@ -92,11 +96,15 @@ export default function AdminHome({ onLogout }) {
 
   const perfilAdmin = { nome: 'Administrador', tipo: 'admin' };
   const handleNavigate = (pagina) => {
-    if (pagina === 'configuracoes') setShowConfig(true);
+    if (pagina === "configuracoes") setShowConfig(true);
+    else if (pagina === "entregadores_cadastro") setShowEntregadores(true);
+    else if (pagina === "estatisticas") setShowEstatisticas(true);
     else setAba(pagina);
   };
 
   if (showConfig) return <AdminConfiguracoes onVoltar={() => setShowConfig(false)} />;
+  if (showEntregadores) return <CadastroEntregador onVoltar={() => setShowEntregadores(false)} />;
+  if (showEstatisticas) return <Estatisticas onVoltar={() => setShowEstatisticas(false)} />;
   if (formAberto) return <FormCliente cliente={clienteEditando} clientes={clientes} onSalvar={handleSalvarCliente} onCancelar={() => { setFormAberto(false); setClienteEditando(null); }} />;
 
   return (

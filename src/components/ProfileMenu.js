@@ -11,6 +11,8 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
     { id: 'rotas', label: 'Entregas', icone: '🚚' },
     { id: 'historico', label: 'Histórico', icone: '📋' },
     { id: 'entregadores', label: 'Entregadores', icone: '📍' },
+    { id: 'entregadores_cadastro', label: 'Cadastrar Entregador', icone: '➕' },
+    { id: 'estatisticas', label: 'Estatísticas', icone: '📊' },
     { id: 'configuracoes', label: 'Configurações', icone: '⚙️' },
     { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
   ];
