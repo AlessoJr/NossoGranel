@@ -22,11 +22,11 @@ export default function Login({ onLogin }) {
 
   return (
     <div style={{ ...styles.container, backgroundColor: cores.background, minHeight: '100vh' }}>
-      <button onClick={toggleTheme} style={{ ...styles.botaoTema, backgroundColor: cores.card, color: cores.text }}>🌓</button>
-      <div style={{ fontSize: 80, marginBottom: 16 }}>🌾</div>
-      <h1 style={{ ...styles.titulo, color: cores.primary }}>NossoGranel</h1>
-      <p style={{ ...styles.sub, color: cores.textSecondary }}>- ALIMENTOS SAUDÁVEIS -</p>
-      <p style={{ ...styles.painel, color: cores.textSecondary }}>Painel Administrativo</p>
+      <button onClick={toggleTheme} style={{ ...styles.botaoTema, backgroundColor: cores.card, color: cores.text }}>🌗</button>
+      <img src="/granel.png" alt="NossoGranel" style={{ width: 180, marginBottom: 16 }} />
+      
+      
+      
       <form onSubmit={handleLogin} style={styles.form}>
         <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
         <input style={{ ...styles.input, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder }} type="password" placeholder="Senha" value={senha} onChange={e => setSenha(e.target.value)} />

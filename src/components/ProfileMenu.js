@@ -7,19 +7,19 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
   const [menuAberto, setMenuAberto] = useState(false);
 
   const opcoesAdmin = [
-    { id: 'clientes', label: '👥 Clientes', icone: '👥' },
-    { id: 'rotas', label: '🚚 Entregas', icone: '🚚' },
-    { id: 'historico', label: '📋 Histórico', icone: '📋' },
-    { id: 'entregadores', label: '📍 Entregadores', icone: '📍' },
-    { id: 'configuracoes', label: '⚙️ Configurações', icone: '⚙️' },
-    { id: 'sair', label: '🚪 Sair', icone: '🚪', cor: '#c0392b' }
+    { id: 'clientes', label: 'Clientes', icone: '👥' },
+    { id: 'rotas', label: 'Entregas', icone: '🚚' },
+    { id: 'historico', label: 'Histórico', icone: '📋' },
+    { id: 'entregadores', label: 'Entregadores', icone: '📍' },
+    { id: 'configuracoes', label: 'Configurações', icone: '⚙️' },
+    { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
   ];
 
   const opcoesEntregador = [
-    { id: 'clientes', label: '👥 Clientes', icone: '👥' },
-    { id: 'rotas', label: '🚚 Minhas Entregas', icone: '🚚' },
-    { id: 'concluidas', label: '✅ Concluídas', icone: '✅' },
-    { id: 'sair', label: '🚪 Sair', icone: '🚪', cor: '#c0392b' }
+    { id: 'clientes', label: 'Clientes', icone: '👥' },
+    { id: 'rotas', label: 'Minhas Entregas', icone: '🚚' },
+    { id: 'concluidas', label: 'Concluídas', icone: '✅' },
+    { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
   ];
 
   const itens = usuario?.tipo === 'admin' ? opcoesAdmin : opcoesEntregador;
@@ -35,7 +35,7 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
       <button onClick={() => setMenuAberto(!menuAberto)} style={{ ...styles.botaoPerfil, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
         <span style={styles.avatar}>👤</span>
         <span style={{ ...styles.nome, color: cores.text }}>{usuario?.nome}</span>
-        <span style={styles.seta}>{menuAberto ? '▲' : '▼'}</span>
+        <span style={{ ...styles.seta, color: cores.text }}>{menuAberto ? '▲' : '▼'}</span>
       </button>
 
       {menuAberto && (
@@ -50,16 +50,15 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
               </div>
             </div>
 
-            {/* Botão de tema dentro do menu */}
-            <div style={{ ...styles.item, borderBottomColor: cores.cardBorder }} onClick={toggleTheme}>
-              <span style={styles.icone}>🌓</span>
+            <div style={{ ...styles.item, borderBottomColor: cores.cardBorder }} onClick={() => { toggleTheme(); setMenuAberto(false); }}>
+              <span style={styles.icone}>🌗</span>
               <span style={{ color: cores.text }}>{darkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
             </div>
 
             {itens.map(item => (
-              <div key={item.id} style={{ ...styles.item, borderBottomColor: cores.cardBorder, color: item.cor || cores.text }} onClick={() => handleClick(item)}>
+              <div key={item.id} style={{ ...styles.item, borderBottomColor: cores.cardBorder }} onClick={() => handleClick(item)}>
                 <span style={styles.icone}>{item.icone}</span>
-                <span>{item.label}</span>
+                <span style={{ color: item.cor || cores.text }}>{item.label}</span>
               </div>
             ))}
           </div>

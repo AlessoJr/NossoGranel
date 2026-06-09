@@ -33,7 +33,7 @@ export const getTheme = (darkMode) => ({
   cardBorder: darkMode ? '#2a2a4a' : '#dddddd',
   text: darkMode ? '#ffffff' : '#333333',
   textSecondary: darkMode ? '#cccccc' : '#666666',
-  primary: '#e2b96f',
+  primary: darkMode ? '#e2b96f' : '#b8860b',
   success: '#27ae60',
   danger: '#c0392b',
   info: '#2980b9',
