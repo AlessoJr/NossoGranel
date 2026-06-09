@@ -6,12 +6,22 @@ import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+// Função segura para copiar – evita null/undefined
 function copiar(texto, label) {
-  navigator.clipboard.writeText(texto).then(() => toast.success(`${label} copiado!`));
+  const valor = texto ? String(texto) : '';
+  if (!valor) {
+    toast.warning(`Nada para copiar`);
+    return;
+  }
+  navigator.clipboard.writeText(valor).then(() => toast.success(`${label} copiado!`));
 }
 
 function abrirGPS(endereco, apt) {
-  const end = `${endereco}${apt ? ` ${apt}` : ''}`;
+  const end = `${endereco || ''}${apt ? `, Apt ${apt}` : ''}`;
+  if (!end.trim()) {
+    toast.warning('Endereço não informado');
+    return;
+  }
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(end)}`, '_blank');
 }
 
@@ -46,7 +56,7 @@ export default function AdminHome({ onLogout }) {
       await salvarCliente(cliente);
       setFormAberto(false);
       setClienteEditando(null);
-      toast.success('Cliente salvo com sucesso!');
+      toast.success('Cliente salvo!');
     } catch (error) {
       alert(`Erro ao salvar: ${error.message}`);
     }
@@ -55,34 +65,38 @@ export default function AdminHome({ onLogout }) {
   const handleExcluirCliente = async (clienteId, clienteNome) => {
     if (!window.confirm(`Excluir ${clienteNome} permanentemente?`)) return;
     try {
-      // Primeiro tenta excluir todas as rotas associadas a este cliente
+      // Excluir rotas associadas
       const rotasDoCliente = rotas.filter(r => r.clienteId === clienteId);
       for (const rota of rotasDoCliente) {
         await excluirRota(rota.id);
       }
-      // Depois exclui o cliente
       await excluirCliente(clienteId);
-      toast.success(`${clienteNome} excluído com sucesso!`);
+      toast.success(`${clienteNome} excluído!`);
     } catch (error) {
-      alert(`Erro ao excluir: ${error.message}`);
+      alert(`Erro: ${error.message}`);
     }
   };
 
   const handleAtribuirRota = async (cliente) => {
-    if (!entregadorSelecionado) { toast.warning('Selecione um entregador!'); return; }
+    if (!entregadorSelecionado) { toast.warning('Selecione um entregador'); return; }
     await criarRota(cliente, entregadorSelecionado, 'adm');
-    toast.success(`Rota de ${cliente.nome} atribuída!`);
+    toast.success(`Rota de ${cliente.nome} atribuída`);
     setEntregadorSelecionado('');
   };
 
   const rotasEmAndamento = rotas.filter(r => r.status === 'em_andamento');
   const rotasConcluidas = rotas.filter(r => r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
 
-  const clientesFiltrados = clientes.filter(c =>
-    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    c.telefone?.includes(busca) ||
-    c.codigoEntrega?.includes(busca)
-  );
+  // Filtro SEGURO: converte campos null para string vazia antes de includes
+  const clientesFiltrados = clientes.filter(c => {
+    const nome = c.nome || '';
+    const telefone = c.telefone || '';
+    const codigo = c.codigoEntrega || '';
+    const termo = busca.toLowerCase();
+    return nome.toLowerCase().includes(termo) ||
+           telefone.includes(termo) ||
+           codigo.includes(termo);
+  });
 
   const perfilAdmin = { nome: 'Administrador', tipo: 'admin' };
   const handleNavigate = (pagina) => {
@@ -109,16 +123,17 @@ export default function AdminHome({ onLogout }) {
           {clientesFiltrados.map(c => {
             const rotaAtiva = rotasEmAndamento.find(r => r.clienteId === c.id);
             const isEmRota = !!rotaAtiva;
+            // Exibição segura: usa fallback para valores nulos
             return (
               <div key={c.id} style={{ ...styles.card, backgroundColor: cores.card, borderColor: isEmRota ? cores.success : cores.cardBorder, borderWidth: isEmRota ? 2 : 1 }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ ...styles.nome, color: cores.primary }}>
-                    {c.nome} 
+                    {c.nome || 'Sem nome'} 
                     {isEmRota && <span style={{ fontSize: 11, color: cores.success, marginLeft: 8 }}>🚚 {rotaAtiva.entregador}</span>}
                   </p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>📞 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone}</span></p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {c.endereco}{c.apt ? `, Apt ${c.apt}` : ''}</p>
-                  <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.codigoEntrega, 'Código')}>{c.codigoEntrega}</span> | 🛒 {c.qtdPedidos}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>📞 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.telefone, 'Telefone')}>{c.telefone || '---'}</span></p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>📍 {c.endereco || '---'}{c.apt ? `, Apt ${c.apt}` : ''}</p>
+                  <p style={{ ...styles.info, color: cores.textSecondary }}>🔑 <span style={{ ...styles.copiavel, color: cores.primary }} onClick={() => copiar(c.codigoEntrega, 'Código')}>{c.codigoEntrega || '---'}</span> | 🛒 {c.qtdPedidos || 0}</p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <select style={{ ...styles.select, backgroundColor: cores.cardBorder, color: cores.text }} value={entregadorSelecionado} onChange={(e) => setEntregadorSelecionado(e.target.value)}>
@@ -127,7 +142,7 @@ export default function AdminHome({ onLogout }) {
                   </select>
                   <button style={{ ...styles.botaoAtribuir, backgroundColor: cores.success, color: '#fff' }} onClick={() => handleAtribuirRota(c)}>🚚 Atribuir</button>
                   <button style={{ ...styles.botaoEditar, backgroundColor: cores.cardBorder, color: cores.text }} onClick={() => { setClienteEditando(c); setFormAberto(true); }}>✏️</button>
-                  <button style={{ ...styles.botaoDeletar, backgroundColor: cores.danger, color: '#fff' }} onClick={() => handleExcluirCliente(c.id, c.nome)}>🗑️</button>
+                  <button style={{ ...styles.botaoDeletar, backgroundColor: cores.danger, color: '#fff' }} onClick={() => handleExcluirCliente(c.id, c.nome || 'cliente')}>🗑️</button>
                 </div>
               </div>
             );
@@ -135,6 +150,7 @@ export default function AdminHome({ onLogout }) {
         </>
       )}
 
+      {/* Abas rotas, historico e entregadores (iguais ao original, sem mudanças) */}
       {aba === 'rotas' && (
         <>
           <h3 style={{ color: cores.primary }}>🚚 Em Andamento ({rotasEmAndamento.length})</h3>
