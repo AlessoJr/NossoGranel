@@ -4,7 +4,7 @@ import { db } from '../firebase';
 // CLIENTES
 export const getClientesRealtime = (callback) => {
   return onSnapshot(collection(db, 'clientes'), (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    callback(snap.docs.map(d => { const data = d.data(); delete data.id; return { id: d.id, ...data }; }));
   });
 };
 
@@ -28,7 +28,7 @@ export const excluirCliente = async (id) => {
 // ROTAS
 export const getRotasRealtime = (callback) => {
   return onSnapshot(collection(db, 'rotas'), (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    callback(snap.docs.map(d => { const data = d.data(); delete data.id; return { id: d.id, ...data }; }));
   });
 };
 
@@ -71,7 +71,7 @@ export const atualizarLocalizacao = async (entregador, lat, lng) => {
 
 export const getLocalizacoesRealtime = (callback) => {
   return onSnapshot(collection(db, 'localizacoes'), (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    callback(snap.docs.map(d => { const data = d.data(); delete data.id; return { id: d.id, ...data }; }));
   });
 };
 

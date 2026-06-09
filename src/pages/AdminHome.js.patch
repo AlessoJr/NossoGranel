@@ -1,0 +1,13 @@
+  const handleExcluirCliente = async (clienteId, clienteNome) => {
+    if (!window.confirm(`Tem certeza que deseja excluir ${clienteNome}?`)) return;
+    try {
+      const rotasDoCliente = rotas.filter(r => r.clienteId === clienteId);
+      for (const rota of rotasDoCliente) {
+        await excluirRota(rota.id);
+      }
+      await excluirCliente(clienteId);
+      toast.success(`${clienteNome} excluído com sucesso!`);
+    } catch (error) {
+      toast.error('Erro ao excluir cliente. Tente novamente.');
+    }
+  };
