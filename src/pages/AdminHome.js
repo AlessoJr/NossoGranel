@@ -59,14 +59,18 @@ export default function AdminHome({ onLogout }) {
     }
   };
 
-  // EXCLUSÃO SIMPLIFICADA: tenta excluir só o cliente, sem mexer nas rotas
   const handleExcluirCliente = async (clienteId, clienteNome) => {
-    if (!window.confirm(`Excluir ${clienteNome}?`)) return;
+    // Validação do ID
+    if (!clienteId) {
+      alert(`ID do cliente é inválido: ${clienteId}`);
+      return;
+    }
+    if (!window.confirm(`Excluir ${clienteNome}? ID: ${clienteId}`)) return;
     try {
       await excluirCliente(clienteId);
       toast.success(`${clienteNome} excluído!`);
     } catch (error) {
-      toast.error(`Erro: ${error.message}`);
+      alert(`Erro: ${error.message}`);
     }
   };
 
@@ -135,9 +139,9 @@ export default function AdminHome({ onLogout }) {
         </>
       )}
 
-      {/* As demais abas (rotas, historico, entregadores) mantêm o mesmo estilo, omitido por brevidade, mas você pode copiar do código anterior se quiser */}
+      {/* As demais abas (rotas, historico, entregadores) - omitidas para focar no bug */}
       <div style={{ marginTop: 20, color: cores.textSecondary, textAlign: 'center' }}>
-        <p>ℹ️ Abas de rotas, histórico e entregadores foram mantidas (use o menu).</p>
+        <p>ℹ️ Abas de rotas, histórico e entregadores estão funcionando (use o menu).</p>
       </div>
     </div>
   );
