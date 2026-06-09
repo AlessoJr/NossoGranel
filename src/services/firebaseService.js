@@ -10,18 +10,18 @@ export const getClientesRealtime = (callback) => {
 
 export const salvarCliente = async (cliente) => {
   if (cliente.id) {
-    // Atualizar cliente existente
     const { id, ...dados } = cliente;
     await updateDoc(doc(db, 'clientes', id), dados);
     return { id, ...dados };
   } else {
-    // Criar novo cliente
     const docRef = await addDoc(collection(db, 'clientes'), cliente);
     return { id: docRef.id, ...cliente };
   }
 };
 
+// EXCLUSÃO SIMPLES – sem nenhuma lógica extra
 export const excluirCliente = async (id) => {
+  if (!id) throw new Error('ID do cliente é obrigatório');
   await deleteDoc(doc(db, 'clientes', id));
 };
 
@@ -35,14 +35,14 @@ export const getRotasRealtime = (callback) => {
 export const criarRota = async (cliente, entregador, criadoPor) => {
   const rota = {
     clienteId: cliente.id,
-    clienteNome: cliente.nome,
-    clienteEndereco: cliente.endereco,
-    clienteTelefone: cliente.telefone,
+    clienteNome: cliente.nome || '',
+    clienteEndereco: cliente.endereco || '',
+    clienteTelefone: cliente.telefone || '',
     clienteApt: cliente.apt || '',
-    codigoEntrega: cliente.codigoEntrega,
-    entregador: entregador,
+    codigoEntrega: cliente.codigoEntrega || '',
+    entregador,
     status: 'em_andamento',
-    criadoPor: criadoPor,
+    criadoPor,
     iniciadoEm: new Date().toISOString()
   };
   const docRef = await addDoc(collection(db, 'rotas'), rota);
@@ -57,6 +57,7 @@ export const concluirRota = async (rotaId) => {
 };
 
 export const excluirRota = async (rotaId) => {
+  if (!rotaId) throw new Error('ID da rota é obrigatório');
   await deleteDoc(doc(db, 'rotas', rotaId));
 };
 
