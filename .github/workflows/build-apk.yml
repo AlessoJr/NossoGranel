@@ -1,76 +1,40 @@
-name: Gerar APK
+name: Build APK
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Pegar código
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-    - name: Instalar Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-    - name: Instalar dependências
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    - name: Build React
-      run: npm run build
+      - name: Build React app
+        run: npm run build
 
-    - name: Instalar Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '21'
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-    - name: Configurar Android SDK
-      uses: android-actions/setup-android@v3
+      - name: Sync Capacitor
+        run: npx cap sync android
 
-    - name: Instalar Capacitor
-      run: npm install @capacitor/android
+      - name: Build APK
+        run: cd android && ./gradlew assembleDebug
 
-    - name: REMOVER PASTA ANDROID EXISTENTE
-      run: rm -rf android
-
-    - name: Adicionar Android
-      run: npx cap add android
-
-    - name: SUBSTITUIR ÍCONE PELO GRANEL.PNG
-      run: |
-        mkdir -p android/app/src/main/res/mipmap-hdpi
-        mkdir -p android/app/src/main/res/mipmap-mdpi
-        mkdir -p android/app/src/main/res/mipmap-xhdpi
-        mkdir -p android/app/src/main/res/mipmap-xxhdpi
-        mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
-        cp app_icons/granel.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
-
-    - name: Copiar build
-      run: npx cap copy android
-
-    - name: Gerar APK
-      run: |
-        cd android
-        chmod +x gradlew
-        ./gradlew assembleDebug
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: NossoGranel-APK
-        path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: NossoGranel-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
