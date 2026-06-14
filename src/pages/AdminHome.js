@@ -72,7 +72,7 @@ async function geocodificar(endereco) {
   return null;
 }
 
-export default function AdminHome({ onLogout }) {
+export default function AdminHome({ onLogout, usuario }) {
   const { darkMode, toggleTheme } = useTheme();
   const cores = getTheme(darkMode);
   const [clientes, setClientes] = useState([]);
@@ -190,7 +190,7 @@ export default function AdminHome({ onLogout }) {
     return nome.includes(termo) || telefone.includes(termo) || codigo.includes(termo);
   });
 
-  const perfilAdmin = { nome: 'Administrador', tipo: 'admin' };
+  const perfilAdmin = usuario || { nome: "Administrador", tipo: "admin" };
   const handleNavigate = (pagina) => {
     if (pagina === 'configuracoes') setShowConfig(true);
     else if (pagina === 'entregadores_cadastro') setShowEntregadores(true);

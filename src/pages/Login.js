@@ -25,7 +25,7 @@ export default function Login({ onLogin }) {
       const perfilDoc = await getDoc(doc(db, 'usuarios', user.uid));
       if (perfilDoc.exists()) {
         const perfil = perfilDoc.data();
-        onLogin({ uid: user.uid, email: user.email, nome: perfil.nome, tipo: perfil.tipo });
+        onLogin({ uid: user.uid, email: user.email, nome: perfil.nome, tipo: perfil.tipo, fotoURL: perfil.fotoURL || null });
       } else {
         // Fallback por email
         const tipo = email.includes('admin') ? 'admin' : 'entregador';

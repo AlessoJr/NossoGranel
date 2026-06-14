@@ -20,7 +20,7 @@ export default function App() {
         const perfilDoc = await getDoc(doc(db, 'usuarios', user.uid));
         if (perfilDoc.exists()) {
           const perfil = perfilDoc.data();
-          setUsuario({ uid: user.uid, email: user.email, nome: perfil.nome, tipo: perfil.tipo });
+          setUsuario({ uid: user.uid, email: user.email, nome: perfil.nome, tipo: perfil.tipo, fotoURL: perfil.fotoURL || null });
         } else {
           const tipo = user.email.includes('admin') ? 'admin' : 'entregador';
           const nome = tipo === 'admin' ? 'Administrador' : 'Entregador';
@@ -61,7 +61,7 @@ export default function App() {
   if (usuario.tipo === 'admin') {
     return (
       <ThemeProvider>
-        <AdminHome onLogout={handleLogout} />
+        <AdminHome onLogout={handleLogout} usuario={usuario} />
         <ToastContainer position="top-right" />
       </ThemeProvider>
     );
