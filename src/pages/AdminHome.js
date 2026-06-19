@@ -72,6 +72,8 @@ async function geocodificar(endereco) {
   return null;
 }
 
+const NOTIFICACOES_VISTAS_KEY_ADM = 'admin_notificacoes_vistas';
+
 export default function AdminHome({ onLogout, usuario }) {
   const { darkMode, toggleTheme } = useTheme();
   const cores = getTheme(darkMode);
@@ -93,10 +95,38 @@ export default function AdminHome({ onLogout, usuario }) {
   const [otimizando, setOtimizando] = useState(false);
   const [previewRota, setPreviewRota] = useState(null);
 
+  const getNotificacoesVistas = () => {
+    const saved = sessionStorage.getItem(NOTIFICACOES_VISTAS_KEY_ADM);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  };
+
+  const salvarNotificacoesVistas = (set) => {
+    sessionStorage.setItem(NOTIFICACOES_VISTAS_KEY_ADM, JSON.stringify([...set]));
+  };
+
   useEffect(() => {
     getEntregadores(setEntregadores);
     const unsub1 = getClientesRealtime(setClientes);
-    const unsub2 = getRotasRealtime(setRotas);
+    const unsub2 = getRotasRealtime((novasRotas) => {
+      const notificadas = getNotificacoesVistas();
+      let atualizado = false;
+      novasRotas.forEach(r => {
+        const idConcluida = `concluida_${r.id}`;
+        if (r.status === 'concluida' && !notificadas.has(idConcluida)) {
+          notificadas.add(idConcluida);
+          atualizado = true;
+          toast.success(`✅ ${r.clienteNome} entregue por ${r.entregador}`);
+        }
+        const idAtivada = `ativada_${r.id}`;
+        if (r.status === 'em_andamento' && r.criadoPor === 'entregador' && !notificadas.has(idAtivada)) {
+          notificadas.add(idAtivada);
+          atualizado = true;
+          toast.info(`🔔 ${r.entregador} ativou rota para ${r.clienteNome}`);
+        }
+      });
+      if (atualizado) salvarNotificacoesVistas(notificadas);
+      setRotas(novasRotas);
+    });
     const unsub3 = getLocalizacoesRealtime(setLocalizacoes);
     return () => { unsub1(); unsub2(); unsub3(); };
   }, []);

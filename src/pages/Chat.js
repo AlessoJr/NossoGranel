@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
-import { collection, addDoc, onSnapshot, query, orderBy, where, or } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, where, or, and } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export default function Chat({ usuario, onVoltar }) {
@@ -36,22 +36,22 @@ export default function Chat({ usuario, onVoltar }) {
     return () => unsub();
   }, []);
 
-  // Chat privado
+  // Chat privado com query otimizada usando or + and
   useEffect(() => {
-    if (!entregadorChat) return;
-    const outroNome = usuario.tipo === 'admin' ? entregadorChat.nome : 'Administrador';
+    if (usuario.tipo === "admin" && !entregadorChat) return;
+    const outroNome = usuario.tipo === "admin" ? entregadorChat?.nome : "Administrador";
+    if (!outroNome) return;
     const q = query(
-      collection(db, 'chat_privado'),
-      orderBy('criadoEm', 'asc')
+      collection(db, "chat_privado"),
+      or(
+        and(where("de", "==", usuario.nome), where("para", "==", outroNome)),
+        and(where("de", "==", outroNome), where("para", "==", usuario.nome))
+      ),
+      orderBy("criadoEm", "asc")
     );
     const unsub = onSnapshot(q, snap => {
-      const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const filtradas = todas.filter(m =>
-        (m.de === usuario.nome && m.para === outroNome) ||
-        (m.de === outroNome && m.para === usuario.nome)
-      );
-      setMensagensPrivadas(filtradas);
-      setTimeout(() => fimRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      setMensagensPrivadas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTimeout(() => fimRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     });
     return () => unsub();
   }, [entregadorChat, usuario.nome]);
@@ -77,6 +77,13 @@ export default function Chat({ usuario, onVoltar }) {
       });
     }
     setTexto('');
+    // Força atualização do chat
+    setTimeout(() => {
+      const q = query(collection(db, "chat_geral"), orderBy("criadoEm", "asc"));
+      onSnapshot(q, snap => {
+        setMensagens(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    }, 100);
   };
 
   const handleKeyPress = (e) => {
@@ -162,7 +169,7 @@ export default function Chat({ usuario, onVoltar }) {
             {abaChat === 'geral' ? 'Nenhuma mensagem no grupo ainda.' : 'Nenhuma mensagem privada ainda.'}
           </p>
         )}
-        {msgExibidas.map(m => <Mensagem key={m.id} m={m} />)}
+        {msgExibidas.map(m => <Mensagem key={`${m.id}-${m.criadoEm}`} m={m} />)}
         <div ref={fimRef} />
       </div>
 
