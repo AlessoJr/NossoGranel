@@ -108,3 +108,19 @@ export const criarUsuario = async (email, senha) => {
   const result = await createUserWithEmailAndPassword(auth, email, senha);
   return result.user;
 };
+
+// NOTIFICAÇÕES
+export const criarNotificacao = async (titulo, mensagem, tipo, destinatario) => {
+  try {
+    await addDoc(collection(db, 'notificacoes'), {
+      titulo,
+      mensagem,
+      tipo,
+      destinatario,
+      lida: false,
+      criadaEm: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Erro ao criar notificacao:', error.code, error.message);
+  }
+};

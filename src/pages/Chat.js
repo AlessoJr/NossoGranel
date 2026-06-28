@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { collection, addDoc, onSnapshot, query, orderBy, where, or, and } from 'firebase/firestore';
 import { db } from '../firebase';
+import { criarNotificacao } from '../services/firebaseService';
 
 export default function Chat({ usuario, onVoltar }) {
   const { darkMode } = useTheme();
@@ -59,31 +60,38 @@ export default function Chat({ usuario, onVoltar }) {
   const enviar = async () => {
     if (!texto.trim()) return;
     const agora = new Date().toISOString();
+    const textoEnviado = texto.trim();
+
     if (abaChat === 'geral') {
       await addDoc(collection(db, 'chat_geral'), {
-        texto: texto.trim(),
+        texto: textoEnviado,
         de: usuario.nome,
         tipo: usuario.tipo,
         criadoEm: agora
       });
+      await criarNotificacao(
+        '💬 Nova mensagem no grupo',
+        `${usuario.nome}: ${textoEnviado}`,
+        'chat_geral',
+        usuario.tipo === 'admin' ? 'todos_entregadores' : 'admin'
+      );
     } else {
       const para = usuario.tipo === 'admin' ? entregadorChat.nome : 'Administrador';
       await addDoc(collection(db, 'chat_privado'), {
-        texto: texto.trim(),
+        texto: textoEnviado,
         de: usuario.nome,
         para,
         tipo: usuario.tipo,
         criadoEm: agora
       });
+      await criarNotificacao(
+        '💬 Mensagem privada',
+        `${usuario.nome}: ${textoEnviado}`,
+        'chat_privado',
+        para === 'Administrador' ? 'admin' : para
+      );
     }
     setTexto('');
-    // Força atualização do chat
-    setTimeout(() => {
-      const q = query(collection(db, "chat_geral"), orderBy("criadoEm", "asc"));
-      onSnapshot(q, snap => {
-        setMensagens(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-    }, 100);
   };
 
   const handleKeyPress = (e) => {

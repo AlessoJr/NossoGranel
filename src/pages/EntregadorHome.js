@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Chat from './Chat';
-import { getClientesRealtime, getRotasRealtime, criarRota, concluirRota, atualizarLocalizacao } from '../services/firebaseService';
+import { getClientesRealtime, getRotasRealtime, criarRota, concluirRota, atualizarLocalizacao, criarNotificacao } from '../services/firebaseService';
 import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -62,7 +62,7 @@ function otimizarRota(rotas, latAtual, lngAtual) {
 
 const NOTIFICACOES_VISTAS_KEY = 'entregador_notificacoes_vistas';
 
-export default function EntregadorHome({ usuario, onLogout }) {
+export default function EntregadorHome({ usuario, onLogout, onNavigate: onNavigateApp }) {
   const { darkMode, toggleTheme } = useTheme();
   const cores = getTheme(darkMode);
   const [clientes, setClientes] = useState([]);
@@ -122,6 +122,12 @@ export default function EntregadorHome({ usuario, onLogout }) {
 
   const handleAtivarRota = async (cliente) => {
     await criarRota(cliente, usuario.nome, 'entregador');
+    await criarNotificacao(
+      '🔔 Rota ativada',
+      `${usuario.nome} ativou rota para ${cliente.nome}`,
+      'rota_ativada',
+      'admin'
+    );
     toast.success(`Rota ativada para ${cliente.nome}!`);
     setAba('rotas');
   };
@@ -129,6 +135,12 @@ export default function EntregadorHome({ usuario, onLogout }) {
   const handleConcluirRota = async (rota) => {
     if (!window.confirm(`Concluir entrega de ${rota.clienteNome}?`)) return;
     await concluirRota(rota.id);
+    await criarNotificacao(
+      '✅ Entrega concluída',
+      `${usuario.nome} entregou para ${rota.clienteNome} — Código: ${rota.codigoEntrega}`,
+      'entrega_concluida',
+      'admin'
+    );
     toast.success(`✅ Entrega de ${rota.clienteNome} concluída!`);
   };
 
@@ -173,7 +185,11 @@ export default function EntregadorHome({ usuario, onLogout }) {
 
   const perfilEntregador = { nome: usuario.nome, tipo: 'entregador' };
   if (showChat) return <Chat usuario={usuario} onVoltar={() => setShowChat(false)} />;
-  const handleNavigate = (pagina) => { if (pagina === 'chat') setShowChat(true); else setAba(pagina); };
+  const handleNavigate = (pagina) => {
+    if (pagina === 'chat') setShowChat(true);
+    else if (pagina === 'notificacoes') { if (onNavigateApp) onNavigateApp('notificacoes'); }
+    else setAba(pagina);
+  };
 
   return (
     <div style={{ ...styles.container, backgroundColor: cores.background }}>

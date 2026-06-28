@@ -13,6 +13,7 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
     { id: 'entregadores', label: 'Entregadores', icone: '📍' },
     { id: 'entregadores_cadastro', label: 'Cadastrar Entregador', icone: '➕' },
     { id: 'chat', label: 'Chat', icone: '💬' },
+    { id: 'notificacoes', label: 'Notificações', icone: '🔔' },
     { id: 'estatisticas', label: 'Estatísticas', icone: '📊' },
     { id: 'configuracoes', label: 'Configurações', icone: '⚙️' },
     { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
@@ -22,6 +23,7 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
     { id: 'clientes', label: 'Clientes', icone: '👥' },
     { id: 'rotas', label: 'Minhas Entregas', icone: '🚚' },
     { id: 'chat', label: 'Chat', icone: '💬' },
+    { id: 'notificacoes', label: 'Notificações', icone: '🔔' },
     { id: 'concluidas', label: 'Concluídas', icone: '✅' },
     { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
   ];
@@ -37,7 +39,10 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
   return (
     <div style={styles.container}>
       <button onClick={() => setMenuAberto(!menuAberto)} style={{ ...styles.botaoPerfil, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
-        {usuario?.fotoURL ? <img src={usuario.fotoURL} alt="foto" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={styles.avatar}>👤</span>}
+        {usuario?.fotoURL
+          ? <img src={usuario.fotoURL} alt="foto" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+          : <span style={styles.avatar}>👤</span>
+        }
         <span style={{ ...styles.nome, color: cores.text }}>{usuario?.nome}</span>
         <span style={{ ...styles.seta, color: cores.text }}>{menuAberto ? '▲' : '▼'}</span>
       </button>
@@ -47,7 +52,10 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
           <div style={styles.overlay} onClick={() => setMenuAberto(false)} />
           <div style={{ ...styles.menu, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
             <div style={{ ...styles.cabecalho, borderBottomColor: cores.cardBorder }}>
-              {usuario?.fotoURL ? <img src={usuario.fotoURL} alt="foto" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={styles.avatarGrande}>👤</span>}
+              {usuario?.fotoURL
+                ? <img src={usuario.fotoURL} alt="foto" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }} />
+                : <span style={styles.avatarGrande}>👤</span>
+              }
               <div>
                 <p style={{ ...styles.nomeGrande, color: cores.text }}>{usuario?.nome}</p>
                 <p style={{ ...styles.email, color: cores.textSecondary }}>{usuario?.tipo === 'admin' ? 'Administrador' : 'Entregador'}</p>
