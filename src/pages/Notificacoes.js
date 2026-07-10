@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, or } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, or, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 
@@ -9,6 +9,25 @@ export default function Notificacoes({ usuario, onVoltar }) {
   const [notificacoes, setNotificacoes] = useState([]);
 
   const destinatario = usuario?.tipo === 'admin' ? 'admin' : usuario?.nome;
+
+  // Marca todas como lidas ao abrir
+  useEffect(() => {
+    if (!destinatario) return;
+    const q = query(
+      collection(db, 'notificacoes'),
+      where('destinatario', '==', destinatario),
+      where('lida', '==', false)
+    );
+    const marcar = async () => {
+      const { getDocs } = await import('firebase/firestore');
+      const snap = await getDocs(q);
+      if (snap.empty) return;
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.update(d.ref, { lida: true }));
+      await batch.commit();
+    };
+    marcar();
+  }, [destinatario]);
 
   useEffect(() => {
     if (!destinatario) return;

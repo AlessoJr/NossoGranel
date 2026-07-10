@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Chat from './Chat';
 import { getClientesRealtime, getRotasRealtime, criarRota, concluirRota, atualizarLocalizacao, criarNotificacao } from '../services/firebaseService';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { db, storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import ProfileMenu from '../components/ProfileMenu';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -73,6 +76,13 @@ export default function EntregadorHome({ usuario, onLogout, onNavigate: onNaviga
   const [rotasOtimizadas, setRotasOtimizadas] = useState(null);
   const [otimizando, setOtimizando] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [status, setStatus] = useState('disponivel');
+  const [showObservacao, setShowObservacao] = useState(null);
+  const [observacao, setObservacao] = useState('');
+  const [showEditarPerfil, setShowEditarPerfil] = useState(false);
+  const [novoTelefone, setNovoTelefone] = useState(usuario?.telefone || '');
+  const [novaFoto, setNovaFoto] = useState(null);
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const watchIdRef = useRef(null);
 
   const getNotificacoesVistas = () => {
@@ -120,6 +130,34 @@ export default function EntregadorHome({ usuario, onLogout, onNavigate: onNaviga
     };
   }, [usuario.nome]);
 
+  const atualizarStatus = async (novoStatus) => {
+    setStatus(novoStatus);
+    try {
+      if (usuario?.uid) {
+        await updateDoc(doc(db, 'usuarios', usuario.uid), { status: novoStatus });
+      }
+    } catch (e) { console.log('erro status', e); }
+  };
+
+  const handleSalvarPerfil = async () => {
+    setSalvandoPerfil(true);
+    try {
+      const dados = { telefone: novoTelefone };
+      if (novaFoto && usuario?.uid) {
+        const fotoRef = ref(storage, `perfis/${usuario.uid}`);
+        await uploadBytes(fotoRef, novaFoto);
+        dados.fotoURL = await getDownloadURL(fotoRef);
+      }
+      if (usuario?.uid) await updateDoc(doc(db, 'usuarios', usuario.uid), dados);
+      toast.success('Perfil atualizado!');
+      setShowEditarPerfil(false);
+    } catch (e) {
+      toast.error('Erro ao salvar perfil');
+    } finally {
+      setSalvandoPerfil(false);
+    }
+  };
+
   const handleAtivarRota = async (cliente) => {
     await criarRota(cliente, usuario.nome, 'entregador');
     await criarNotificacao(
@@ -133,15 +171,26 @@ export default function EntregadorHome({ usuario, onLogout, onNavigate: onNaviga
   };
 
   const handleConcluirRota = async (rota) => {
-    if (!window.confirm(`Concluir entrega de ${rota.clienteNome}?`)) return;
+    setShowObservacao(rota);
+    setObservacao('');
+  };
+
+  const confirmarConclusao = async () => {
+    const rota = showObservacao;
+    if (!rota) return;
     await concluirRota(rota.id);
+    if (observacao.trim()) {
+      await updateDoc(doc(db, 'rotas', rota.id), { observacao: observacao.trim() });
+    }
     await criarNotificacao(
       '✅ Entrega concluída',
-      `${usuario.nome} entregou para ${rota.clienteNome} — Código: ${rota.codigoEntrega}`,
+      `${usuario.nome} entregou para ${rota.clienteNome} — Código: ${rota.codigoEntrega}${observacao ? ' — ' + observacao : ''}`,
       'entrega_concluida',
       'admin'
     );
     toast.success(`✅ Entrega de ${rota.clienteNome} concluída!`);
+    setShowObservacao(null);
+    setObservacao('');
   };
 
   const handleOtimizarRota = async () => {
@@ -191,10 +240,84 @@ export default function EntregadorHome({ usuario, onLogout, onNavigate: onNaviga
     else setAba(pagina);
   };
 
-  return (
+  const corStatus = status === 'disponivel' ? cores.success : status === 'em_rota' ? cores.primary : cores.warning;
+  const labelStatus = status === 'disponivel' ? '🟢 Disponível' : status === 'em_rota' ? '🚚 Em Rota' : '⏸️ Pausado';
+
+  if (showEditarPerfil) return (
     <div style={{ ...styles.container, backgroundColor: cores.background }}>
       <div style={styles.header}>
-        <h1 style={{ ...styles.titulo, color: cores.primary }}>🚚 {usuario.nome}</h1>
+        <h2 style={{ color: cores.primary, margin: 0 }}>✏️ Editar Perfil</h2>
+        <button style={{ backgroundColor: cores.card, color: cores.text, border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' }} onClick={() => setShowEditarPerfil(false)}>← Voltar</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 16 }}>
+        <div style={{ width: 90, height: 90, borderRadius: '50%', backgroundColor: cores.cardBorder, overflow: 'hidden', border: `3px solid ${cores.primary}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => document.getElementById('fotoInput').click()}>
+          {novaFoto
+            ? <img src={URL.createObjectURL(novaFoto)} alt="nova foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : usuario?.fotoURL
+              ? <img src={usuario.fotoURL} alt="foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontSize: 36 }}>👤</span>
+          }
+        </div>
+        <input id="fotoInput" type="file" accept="image/*" style={{ display: 'none' }} onChange={e => setNovaFoto(e.target.files[0])} />
+        <button style={{ backgroundColor: cores.cardBorder, color: cores.text, border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13 }}
+          onClick={() => document.getElementById('fotoInput').click()}>📷 Trocar foto</button>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+          <label style={{ color: cores.textSecondary, fontSize: 13 }}>Telefone</label>
+          <input style={{ width: '100%', border: `1px solid ${cores.cardBorder}`, borderRadius: 10, padding: 12, fontSize: 15, backgroundColor: cores.card, color: cores.text, boxSizing: 'border-box', marginTop: 4 }}
+            value={novoTelefone} onChange={e => setNovoTelefone(e.target.value)} placeholder="Seu telefone" />
+        </div>
+        <button style={{ width: '100%', maxWidth: 400, backgroundColor: cores.primary, color: cores.background, border: 'none', borderRadius: 10, padding: 14, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', opacity: salvandoPerfil ? 0.7 : 1 }}
+          onClick={handleSalvarPerfil} disabled={salvandoPerfil}>
+          {salvandoPerfil ? 'Salvando...' : '💾 Salvar'}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ ...styles.container, backgroundColor: cores.background }}>
+      {/* Modal de observação ao concluir */}
+      {showObservacao && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ backgroundColor: cores.card, borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 }}>
+            <h3 style={{ color: cores.primary, margin: '0 0 8px' }}>✅ Concluir entrega</h3>
+            <p style={{ color: cores.text, margin: '0 0 16px', fontSize: 14 }}>Cliente: <strong>{showObservacao.clienteNome}</strong></p>
+            <textarea
+              style={{ width: '100%', border: `1px solid ${cores.cardBorder}`, borderRadius: 10, padding: 12, fontSize: 14, backgroundColor: cores.background, color: cores.text, fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box' }}
+              placeholder="Observação (opcional): ex: deixei com porteiro, cliente não estava..."
+              rows={3}
+              value={observacao}
+              onChange={e => setObservacao(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button style={{ flex: 1, backgroundColor: cores.success, color: '#fff', border: 'none', borderRadius: 10, padding: 12, fontWeight: 'bold', cursor: 'pointer' }}
+                onClick={confirmarConclusao}>✅ Confirmar</button>
+              <button style={{ flex: 1, backgroundColor: cores.cardBorder, color: cores.text, border: 'none', borderRadius: 10, padding: 12, fontWeight: 'bold', cursor: 'pointer' }}
+                onClick={() => setShowObservacao(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={styles.header}>
+        <div>
+          <h1 style={{ ...styles.titulo, color: cores.primary, margin: 0 }}>🚚 {usuario.nome}</h1>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            {['disponivel', 'em_rota', 'pausado'].map(s => (
+              <button key={s} onClick={() => atualizarStatus(s)}
+                style={{ border: 'none', borderRadius: 20, padding: '4px 10px', fontSize: 11, fontWeight: 'bold', cursor: 'pointer',
+                  backgroundColor: status === s ? corStatus : cores.cardBorder,
+                  color: status === s ? '#fff' : cores.textSecondary }}>
+                {s === 'disponivel' ? '🟢' : s === 'em_rota' ? '🚚' : '⏸️'}
+              </button>
+            ))}
+            <button onClick={() => setShowEditarPerfil(true)}
+              style={{ border: 'none', borderRadius: 20, padding: '4px 10px', fontSize: 11, cursor: 'pointer', backgroundColor: cores.cardBorder, color: cores.textSecondary }}>
+              ✏️ Perfil
+            </button>
+          </div>
+        </div>
         <ProfileMenu usuario={perfilEntregador} onLogout={onLogout} toggleTheme={toggleTheme} onNavigate={handleNavigate} />
       </div>
 
@@ -257,9 +380,15 @@ export default function EntregadorHome({ usuario, onLogout, onNavigate: onNaviga
               <p style={{ ...styles.info, color: cores.text }}>📍 {r.clienteEndereco}{r.clienteApt ? `, Apt ${r.clienteApt}` : ''}</p>
               <p style={{ ...styles.info, color: cores.text }}>📞 {r.clienteTelefone}</p>
               <p style={{ ...styles.info, color: cores.text }}>🔑 <strong style={{ fontSize: 20, color: cores.primary }}>{r.codigoEntrega}</strong></p>
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                 <button style={{ ...styles.botaoGPS, backgroundColor: cores.info, color: '#fff' }} onClick={() => abrirGPS(r.clienteEndereco, r.clienteApt)}>📍 GPS</button>
                 <button style={{ ...styles.botaoConcluir, backgroundColor: cores.success, color: '#fff' }} onClick={() => handleConcluirRota(r)}>✅ Concluir</button>
+                <button style={{ ...styles.botaoConcluir, backgroundColor: cores.warning, color: '#fff' }} onClick={async () => {
+                  if (!window.confirm('Reagendar entrega de ' + r.clienteNome + '?')) return;
+                  await updateDoc(doc(db, 'rotas', r.id), { reagendado: true, reagendadoEm: new Date().toISOString() });
+                  await criarNotificacao('🔄 Entrega reagendada', r.clienteNome + ' — ' + usuario.nome + ' sinalizou reagendamento', 'reagendamento', 'admin');
+                  toast.info('Entrega de ' + r.clienteNome + ' marcada para reagendamento');
+                }}>🔄 Reagendar</button>
               </div>
             </div>
           ))}

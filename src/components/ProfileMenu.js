@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme, getTheme } from '../contexts/ThemeContext';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate }) {
   const { darkMode } = useTheme();
   const cores = getTheme(darkMode);
   const [menuAberto, setMenuAberto] = useState(false);
+  const [naoLidas, setNaoLidas] = useState(0);
+
+  useEffect(() => {
+    if (!usuario) return;
+    const destinatario = usuario.tipo === 'admin' ? 'admin' : usuario.nome;
+    const q = query(
+      collection(db, 'notificacoes'),
+      where('destinatario', '==', destinatario),
+      where('lida', '==', false)
+    );
+    const unsub = onSnapshot(q, snap => setNaoLidas(snap.size));
+    return () => unsub();
+  }, [usuario]);
 
   const opcoesAdmin = [
     { id: 'clientes', label: 'Clientes', icone: '👥' },
@@ -13,7 +28,7 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
     { id: 'entregadores', label: 'Entregadores', icone: '📍' },
     { id: 'entregadores_cadastro', label: 'Cadastrar Entregador', icone: '➕' },
     { id: 'chat', label: 'Chat', icone: '💬' },
-    { id: 'notificacoes', label: 'Notificações', icone: '🔔' },
+    { id: 'notificacoes', label: 'Notificações', icone: '🔔', badge: naoLidas },
     { id: 'estatisticas', label: 'Estatísticas', icone: '📊' },
     { id: 'configuracoes', label: 'Configurações', icone: '⚙️' },
     { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
@@ -23,7 +38,7 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
     { id: 'clientes', label: 'Clientes', icone: '👥' },
     { id: 'rotas', label: 'Minhas Entregas', icone: '🚚' },
     { id: 'chat', label: 'Chat', icone: '💬' },
-    { id: 'notificacoes', label: 'Notificações', icone: '🔔' },
+    { id: 'notificacoes', label: 'Notificações', icone: '🔔', badge: naoLidas },
     { id: 'concluidas', label: 'Concluídas', icone: '✅' },
     { id: 'sair', label: 'Sair', icone: '🚪', cor: '#c0392b' }
   ];
@@ -39,10 +54,17 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
   return (
     <div style={styles.container}>
       <button onClick={() => setMenuAberto(!menuAberto)} style={{ ...styles.botaoPerfil, backgroundColor: cores.card, borderColor: cores.cardBorder }}>
-        {usuario?.fotoURL
-          ? <img src={usuario.fotoURL} alt="foto" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
-          : <span style={styles.avatar}>👤</span>
-        }
+        <div style={{ position: 'relative' }}>
+          {usuario?.fotoURL
+            ? <img src={usuario.fotoURL} alt="foto" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+            : <span style={styles.avatar}>👤</span>
+          }
+          {naoLidas > 0 && (
+            <div style={{ position: 'absolute', top: -6, right: -6, backgroundColor: '#c0392b', borderRadius: '50%', minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 'bold', color: '#fff', padding: '0 3px' }}>
+              {naoLidas > 99 ? '99+' : naoLidas}
+            </div>
+          )}
+        </div>
         <span style={{ ...styles.nome, color: cores.text }}>{usuario?.nome}</span>
         <span style={{ ...styles.seta, color: cores.text }}>{menuAberto ? '▲' : '▼'}</span>
       </button>
@@ -70,7 +92,12 @@ export default function ProfileMenu({ usuario, onLogout, toggleTheme, onNavigate
             {itens.map(item => (
               <div key={item.id} style={{ ...styles.item, borderBottomColor: cores.cardBorder }} onClick={() => handleClick(item)}>
                 <span style={styles.icone}>{item.icone}</span>
-                <span style={{ color: item.cor || cores.text }}>{item.label}</span>
+                <span style={{ color: item.cor || cores.text, flex: 1 }}>{item.label}</span>
+                {item.badge > 0 && (
+                  <div style={{ backgroundColor: '#c0392b', borderRadius: 12, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold', color: '#fff', padding: '0 5px' }}>
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -88,6 +88,9 @@ export default function AdminHome({ onLogout, onNavigate }) {
   const [modoSelecao, setModoSelecao] = useState(false);
   const [otimizando, setOtimizando] = useState(false);
   const [previewRota, setPreviewRota] = useState(null);
+  const [buscaHistorico, setBuscaHistorico] = useState('');
+  const [filtroData, setFiltroData] = useState('todos');
+  const [avaliacaoAberta, setAvaliacaoAberta] = useState(null);
 
   // Recupera notificações já vistas na sessão
   const getNotificacoesVistas = () => {
@@ -201,6 +204,60 @@ export default function AdminHome({ onLogout, onNavigate }) {
     }, 500);
   };
 
+  const exportarCSV = (dados, nomeArquivo) => {
+    if (dados.length === 0) { toast.warning('Nenhum dado para exportar'); return; }
+    const cabecalho = Object.keys(dados[0]).join(',');
+    const linhas = dados.map(row =>
+      Object.values(row).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
+    );
+    const csv = [cabecalho, ...linhas].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${nomeArquivo} exportado!`);
+  };
+
+  const exportarClientes = () => {
+    const dados = clientes.map(c => ({
+      Nome: c.nome || '',
+      Telefone: c.telefone || '',
+      Endereco: c.endereco || '',
+      Apt: c.apt || '',
+      Codigo: c.codigoEntrega || '',
+      Pedidos: c.qtdPedidos || 0,
+      Observacoes: c.observacoes || ''
+    }));
+    exportarCSV(dados, 'clientes_nossogranel.csv');
+  };
+
+  const exportarHistorico = () => {
+    const dados = rotasConcluidas.map(r => ({
+      Cliente: r.clienteNome || '',
+      Entregador: r.entregador || '',
+      Codigo: r.codigoEntrega || '',
+      Iniciado: r.iniciadoEm ? new Date(r.iniciadoEm).toLocaleString('pt-BR') : '',
+      Concluido: r.concluidoEm ? new Date(r.concluidoEm).toLocaleString('pt-BR') : '',
+      Avaliacao: r.avaliacao || '',
+      Observacao: r.observacao || ''
+    }));
+    exportarCSV(dados, 'historico_entregas.csv');
+  };
+
+  const salvarAvaliacao = async (rotaId, nota) => {
+    try {
+      const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore');
+      await updateDoc(firestoreDoc(db, 'rotas', rotaId), { avaliacao: nota });
+      toast.success(`Avaliação ${nota}⭐ salva!`);
+      setAvaliacaoAberta(null);
+    } catch (e) {
+      toast.error('Erro ao salvar avaliação');
+    }
+  };
+
   const rotasEmAndamento = rotas.filter(r => r.status === 'em_andamento');
   const rotasConcluidas = rotas.filter(r => r.status === 'concluida').sort((a, b) => new Date(b.concluidoEm) - new Date(a.concluidoEm));
 
@@ -242,6 +299,7 @@ export default function AdminHome({ onLogout, onNavigate }) {
             <button style={{ ...styles.botaoModo, backgroundColor: modoSelecao ? cores.danger : cores.info, color: '#fff' }} onClick={() => setModoSelecao(!modoSelecao)}>
               {modoSelecao ? '✖ Cancelar Seleção' : '☑️ Selecionar Múltiplos'}
             </button>
+            <button style={{ ...styles.botaoNovo, backgroundColor: cores.success, color: '#fff' }} onClick={exportarClientes}>📥 CSV</button>
             {modoSelecao && clientesSelecionados.length > 0 && (
               <span style={{ color: cores.text, marginLeft: 8 }}>{clientesSelecionados.length} selecionados</span>
             )}
@@ -337,24 +395,94 @@ export default function AdminHome({ onLogout, onNavigate }) {
         </>
       )}
 
-      {aba === 'historico' && (
-        <>
-          <h3 style={{ color: cores.primary }}>📋 Concluídas ({rotasConcluidas.length})</h3>
-          {rotasConcluidas.map(r => (
-            <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card, borderColor: cores.success }}>
-              <p style={{ color: cores.text }}><strong style={{ color: cores.primary }}>{r.clienteNome}</strong> - 👤 <span style={{ color: cores.text }}>{r.entregador}</span></p>
-              <p style={{ color: cores.textSecondary }}>🔑 {r.codigoEntrega}</p>
-              <p style={{ color: cores.success }}>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                <button style={{ backgroundColor: cores.danger, color: '#fff', border: 'none', padding: 8, borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
-                  onClick={() => { if (window.confirm(`Excluir entrega de ${r.clienteNome}?`)) excluirRota(r.id); }}>
-                  🗑️ Excluir
+      {aba === 'historico' && (() => {
+        const agora = new Date();
+        const historicoFiltrado = rotasConcluidas.filter(r => {
+          const termo = buscaHistorico.toLowerCase();
+          const buscaOk = !termo ||
+            r.clienteNome?.toLowerCase().includes(termo) ||
+            r.entregador?.toLowerCase().includes(termo) ||
+            r.codigoEntrega?.toLowerCase().includes(termo);
+          if (!buscaOk) return false;
+          if (filtroData === 'hoje') {
+            return r.concluidoEm?.startsWith(agora.toISOString().split('T')[0]);
+          }
+          if (filtroData === 'semana') {
+            const d = new Date(agora); d.setDate(d.getDate() - 7);
+            return new Date(r.concluidoEm) >= d;
+          }
+          if (filtroData === 'mes') {
+            const d = new Date(agora); d.setDate(d.getDate() - 30);
+            return new Date(r.concluidoEm) >= d;
+          }
+          return true;
+        });
+        return (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{ color: cores.primary, margin: 0 }}>📋 Concluídas ({historicoFiltrado.length})</h3>
+            <button style={{ backgroundColor: cores.success, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }} onClick={exportarHistorico}>📥 CSV</button>
+          </div>
+            <input
+              style={{ ...styles.busca, backgroundColor: cores.card, color: cores.text, borderColor: cores.cardBorder, marginBottom: 8 }}
+              placeholder="Buscar por cliente, entregador ou código..."
+              value={buscaHistorico}
+              onChange={e => setBuscaHistorico(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              {[
+                { id: 'todos', label: 'Todos' },
+                { id: 'hoje', label: 'Hoje' },
+                { id: 'semana', label: '7 dias' },
+                { id: 'mes', label: '30 dias' },
+              ].map(f => (
+                <button key={f.id} onClick={() => setFiltroData(f.id)}
+                  style={{ border: 'none', borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer', backgroundColor: filtroData === f.id ? cores.primary : cores.card, color: filtroData === f.id ? cores.background : cores.text }}>
+                  {f.label}
                 </button>
-              </div>
+              ))}
             </div>
-          ))}
-        </>
-      )}
+            {historicoFiltrado.length === 0 && <p style={{ color: cores.textSecondary, textAlign: 'center', marginTop: 20 }}>Nenhuma entrega encontrada.</p>}
+            {historicoFiltrado.map(r => (
+              <div key={r.id} style={{ ...styles.cardConcluido, backgroundColor: cores.card, borderColor: cores.success }}>
+                <p style={{ color: cores.text }}><strong style={{ color: cores.primary }}>{r.clienteNome}</strong> - 👤 <span style={{ color: cores.text }}>{r.entregador}</span></p>
+                <p style={{ color: cores.textSecondary }}>🔑 {r.codigoEntrega}</p>
+                <p style={{ color: cores.success }}>✅ {new Date(r.concluidoEm).toLocaleString()}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <div>
+                    {r.avaliacao ? (
+                      <span style={{ fontSize: 14 }}>{'⭐'.repeat(r.avaliacao)}{'☆'.repeat(5 - r.avaliacao)}</span>
+                    ) : (
+                      <button style={{ backgroundColor: cores.cardBorder, color: cores.text, border: 'none', padding: '6px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
+                        onClick={() => setAvaliacaoAberta(r.id)}>
+                        ⭐ Avaliar
+                      </button>
+                    )}
+                    {avaliacaoAberta === r.id && (
+                      <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                        {[1,2,3,4,5].map(n => (
+                          <button key={n} onClick={() => salvarAvaliacao(r.id, n)}
+                            style={{ backgroundColor: cores.primary, color: cores.background, border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                            {n}⭐
+                          </button>
+                        ))}
+                        <button onClick={() => setAvaliacaoAberta(null)}
+                          style={{ backgroundColor: cores.cardBorder, color: cores.text, border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button style={{ backgroundColor: cores.danger, color: '#fff', border: 'none', padding: 8, borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
+                    onClick={() => { if (window.confirm(`Excluir entrega de ${r.clienteNome}?`)) excluirRota(r.id); }}>
+                    🗑️ Excluir
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        );
+      })()}
     </div>
   );
 }

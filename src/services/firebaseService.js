@@ -50,10 +50,23 @@ export const criarRota = async (cliente, entregador, criadoPor) => {
 };
 
 export const concluirRota = async (rotaId) => {
-  await updateDoc(doc(db, 'rotas', rotaId), {
+  const rotaRef = doc(db, 'rotas', rotaId);
+  const rotaSnap = await getDoc(rotaRef);
+  await updateDoc(rotaRef, {
     status: 'concluida',
     concluidoEm: new Date().toISOString()
   });
+  if (rotaSnap.exists()) {
+    const clienteId = rotaSnap.data().clienteId;
+    if (clienteId) {
+      const clienteRef = doc(db, 'clientes', clienteId);
+      const clienteSnap = await getDoc(clienteRef);
+      if (clienteSnap.exists()) {
+        const atual = clienteSnap.data().qtdPedidos || 0;
+        await updateDoc(clienteRef, { qtdPedidos: atual + 1 });
+      }
+    }
+  }
 };
 
 export const excluirRota = async (rotaId) => {
